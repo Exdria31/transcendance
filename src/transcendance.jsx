@@ -11,8 +11,15 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.0";
+const VERSION = "0.5.1";
 const CHANGELOG = [
+  { v: "0.5.1", date: "6 juillet 2026", titre: "Lisibilité & agencement peaufinés", points: [
+    "Textes nettement plus grands et plus contrastés — fini de plisser les yeux.",
+    "Plus aucun débordement : le jeu tient dans l'écran, sans barre de défilement.",
+    "Les onglets s'étendent sur toute la largeur ; statistiques et journal passent juste en dessous.",
+    "Nouvelle fenêtre Commandes en bas à droite : AFK, ZONE, RESET RUN et Paramètres.",
+    "Barre du haut réorganisée : tokens de boss à gauche, zone au centre, or à droite — en plus gros.",
+  ] },
   { v: "0.5.0", date: "6 juillet 2026", titre: "Grand écran & armes de Transcendance", points: [
     "Le jeu occupe enfin tout l'écran : statistiques de combat et journal de combat ont leurs propres fenêtres, à droite.",
     "Nouvelle direction artistique des textes — polices élégantes façon FF13.",
@@ -1858,18 +1865,19 @@ function EncaisserBtn({ G, maj }) {
   return (
     <button className={"btn " + (arme ? "danger" : "ghost")} disabled={G.run.over}
       onClick={() => { if (!arme) { setArme(true); return; } finRun(G, false); setArme(false); maj(); }}>
-      {arme ? "Sûr ? Les jauges seront actées" : "Encaisser la run"}
+      {arme ? "Sûr ? Les jauges seront actées" : "↺ RESET RUN"}
     </button>
   );
 }
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
-.trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#eef0ff; --dim:#9aa3c7; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
+.trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#f2f4ff; --dim:#aeb8dc; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
   background: radial-gradient(1200px 500px at 50% -10%, #2a3358 0%, #161b2e 60%), #161b2e;
-  color:var(--txt); font-family:'Cormorant Garamond', Georgia, serif; font-size:15.5px; line-height:1.4;
-  min-height:100vh; padding:12px 18px; display:flex; flex-direction:column; gap:10px; width:100%; margin:0 auto; }
+  color:var(--txt); font-family:'Cormorant Garamond', Georgia, serif; font-size:17px; font-weight:500; line-height:1.35;
+  min-height:100vh; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box; overflow-x:clip; }
 .trx *{ box-sizing:border-box; }
+.trx b{ font-weight:700; }
 .trx button{ font-family:'Cinzel', Georgia, serif; }
 .px{ image-rendering:pixelated; display:block; }
 .titre{ text-align:center; font-size:18px; letter-spacing:6px; color:var(--leaf); text-shadow:0 0 12px rgba(126,224,110,.35), 2px 2px 0 #0c0f1e; margin:2px 0 0; }
@@ -1886,7 +1894,7 @@ const CSS = `
 .pip.cur{ animation:pulse 1.1s infinite; border-color:var(--cyan); }
 .gear{ background:none; border:none; color:var(--dim); font-size:17px; cursor:pointer; padding:2px 4px; }
 .gear:hover{ color:var(--txt); }
-.scene{ position:relative; height:252px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
+.scene{ position:relative; height:220px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
   background:linear-gradient(#2e3a68 0%, #232b52 42%, #1a2138 100%);
   display:flex; align-items:flex-end; justify-content:space-between; padding:0 4%; }
 .treeline{ position:absolute; left:-2%; right:-2%; bottom:30px; height:88px; background:#1e3326; opacity:.9;
@@ -1993,28 +2001,39 @@ const CSS = `
 @keyframes toastIn{ from{ transform:translateY(-8px); opacity:0;} to{ transform:translateY(0); opacity:1;} }
 @media (prefers-reduced-motion: reduce){ .bob,.bob2,.pip.cur,.pend,.luciole,.apparait{ animation:none; } }
 .titre,.mtitre,.vsband,.tabbtn,.pname,.btn.big,.zlabel,.msep,.jnom,.slotnom,.ctitel{ font-family:'Cinzel', Georgia, serif; }
-.titre{ font-size:26px; } .mtitre{ font-size:20px; } .tabbtn{ font-size:13px; letter-spacing:1px; } .pname{ font-size:11px; } .btn.big{ font-size:14px; }
-.cinfo{ font-size:13.5px; } .note{ font-size:13px; } .btn{ font-size:12px; } .schip{ font-size:14px; }
-.invnom{ font-size:14.5px; } .invstats{ font-size:12.5px; } .slotit{ font-size:13px; } .slotvide{ font-size:12px; } .slotnom{ font-size:10.5px; }
-.jhead{ font-size:13.5px; } .jsrc{ font-size:11.5px; } .jpal{ font-size:12.5px; } .jeff{ font-size:12px; } .niv{ font-size:11.5px; }
-.toast{ font-size:13.5px; } .bartxt{ font-size:10px; } .mgain{ font-size:13.5px; } .mstats{ font-size:13.5px; } .cinfo.sub{ font-size:13px; }
-.zlabel{ font-size:13px; } .chip{ font-size:12.5px; font-family:'Cormorant Garamond', Georgia, serif; font-weight:600; }
+.titre{ font-size:24px; } .mtitre{ font-size:20px; } .tabbtn{ font-size:15px; letter-spacing:1px; } .pname{ font-size:12px; } .btn.big{ font-size:15px; }
+.cinfo{ font-size:15.5px; } .note{ font-size:15px; } .btn{ font-size:13.5px; } .schip{ font-size:16px; }
+.invnom{ font-size:16px; } .invstats{ font-size:14px; } .slotit{ font-size:14.5px; } .slotvide{ font-size:13.5px; } .slotnom{ font-size:11.5px; }
+.jhead{ font-size:15.5px; margin-bottom:2px; } .jsrc{ font-size:13.5px; } .jpal{ font-size:14.5px; } .jeff{ font-size:14px; margin-top:2px; } .niv{ font-size:13px; }
+.toast{ font-size:15px; } .bartxt{ font-size:11px; } .mgain{ font-size:15px; } .mstats{ font-size:15px; } .cinfo.sub{ font-size:14.5px; }
+.zlabel{ font-size:16px; } .chip{ font-size:14px; font-family:'Cormorant Garamond', Georgia, serif; font-weight:600; }
 .ta{ font-family:ui-monospace, 'Courier New', monospace; }
-.colonnes{ display:grid; grid-template-columns:minmax(0,1fr) 290px 330px; gap:10px; align-items:start; }
-.colG{ display:flex; flex-direction:column; gap:10px; min-width:0; }
-.colcote{ position:sticky; top:10px; }
+.note{ background:rgba(0,0,0,.34); color:#c6cdea; margin:0 0 8px; }
+.jauge{ margin-bottom:8px; }
+.panneau{ padding:10px 12px; }
+.jauge,.note,.grid2{ max-width:1080px; }
+.colonnes{ display:grid; grid-template-columns:minmax(0,1fr) 300px 340px; gap:8px; align-items:start; }
+.colG{ display:flex; flex-direction:column; gap:8px; min-width:0; }
+.colcote{ position:sticky; top:8px; display:flex; flex-direction:column; gap:8px; }
 .pcote{ min-height:0; }
-.ctitel{ font-size:12.5px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:9px; }
+.ctitel{ font-size:14px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:9px; }
 .statcol{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .statcol .schip{ display:flex; justify-content:space-between; align-items:baseline; }
 .colM .chips{ flex-wrap:wrap; overflow:visible; }
-.loglist{ display:flex; flex-direction:column; gap:4px; font-size:13.5px; max-height:560px; overflow-y:auto; }
+.loglist{ display:flex; flex-direction:column; gap:4px; font-size:15px; max-height:400px; overflow-y:auto; }
 .loglist div{ text-shadow:1px 1px 0 #000; }
-.slottag{ font-size:10.5px; text-transform:uppercase; letter-spacing:.5px; border:1px solid var(--line); border-radius:4px; padding:1px 6px; font-family:'Cinzel', Georgia, serif; }
+.cmdcol{ display:flex; flex-direction:column; gap:7px; }
+.cmdcol .btn{ width:100%; text-align:center; padding:9px 10px; }
+.topbar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
+.tbcentre{ display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; }
+.tbside{ font-size:20px; font-weight:700; }
+.tbdim{ font-size:13px; color:var(--dim); font-weight:500; }
+.tbdroite{ text-align:right; }
+.slottag{ font-size:11px; text-transform:uppercase; letter-spacing:.5px; border:1px solid var(--line); border-radius:4px; padding:1px 6px; font-family:'Cinzel', Georgia, serif; }
 .vendrow{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
 .togline{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
-.numin{ width:76px; background:#12162a; border:2px solid var(--line); border-radius:6px; color:var(--txt); padding:3px 6px; font-family:inherit; font-size:13.5px; }
-@media (max-width:1220px){ .colonnes{ grid-template-columns:minmax(0,1fr) 260px; } .colD{ grid-column:1 / -1; position:static; } .loglist{ max-height:180px; } }
+.numin{ width:76px; background:#12162a; border:2px solid var(--line); border-radius:6px; color:var(--txt); padding:3px 6px; font-family:inherit; font-size:15px; }
+@media (max-width:1220px){ .colonnes{ grid-template-columns:minmax(0,1fr) 270px; } .colD{ grid-column:1 / -1; position:static; } .loglist{ max-height:180px; } }
 @media (max-width:880px){ .colonnes{ grid-template-columns:1fr; } .colcote{ position:static; } }
 .panneau{ border-radius:16px; background:rgba(26,29,50,.92); }
 .carte{ border-radius:14px; } .btn{ border-radius:10px; } .topbar{ border-radius:14px; background:rgba(26,29,50,.92); }
@@ -2094,31 +2113,27 @@ export default function Transcendance() {
         <div className="stitre">idle roguelite — v{VERSION}</div>
       </div>
       <div className="topbar">
-        <span className="zlabel">
-          <button className="zarrow" disabled={run.zoneIdx <= 0 || run.over} onClick={() => { changerZone(G, -1); maj(); }} title="Zone précédente">◀</button>
-          <b style={{ color: ZONES[run.zoneIdx].col }}>{ZONES[run.zoneIdx].nom}</b> · niv {run.niveau}/10
-          <button className="zarrow" disabled={run.zoneIdx >= run.debloque || run.zoneIdx >= ZONES.length - 1 || run.over} onClick={() => { changerZone(G, 1); maj(); }} title="Zone suivante (débloquée en battant le Gardien)">▶</button>
+        <span className="tbside tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
+        <span className="tbcentre">
+          <span className="zlabel">
+            <button className="zarrow" disabled={run.zoneIdx <= 0 || run.over} onClick={() => { changerZone(G, -1); maj(); }} title="Zone précédente">◀</button>
+            <b style={{ color: ZONES[run.zoneIdx].col }}>{ZONES[run.zoneIdx].nom}</b> · niv {run.niveau}/10
+            <button className="zarrow" disabled={run.zoneIdx >= run.debloque || run.zoneIdx >= ZONES.length - 1 || run.over} onClick={() => { changerZone(G, 1); maj(); }} title="Zone suivante (débloquée en battant le Gardien)">▶</button>
+          </span>
+          <Pips kills={run.kills} />
         </span>
-        <Pips kills={run.kills} />
-        <div className="res">
-          <span className="gold">◆ {fmtM(run.gold)}</span>
-          <span className="tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null}</span>
-          <button className={"btn mini" + (G.meta.opts.autoRelance ? " on" : "")} title="AFK farm : relance automatiquement une run après la mort" onClick={() => { G.meta.opts.autoRelance = !G.meta.opts.autoRelance; G.saveNow = true; maj(); }}>⟳ run</button>
-          <button className={"btn mini" + (G.meta.opts.autoZone ? " on" : "")} title="Passe automatiquement à la zone suivante après le Gardien" onClick={() => { G.meta.opts.autoZone = !G.meta.opts.autoZone; G.saveNow = true; maj(); }}>⇉ zone</button>
-          <EncaisserBtn G={G} maj={maj} />
-          <button className="gear" onClick={() => setOpts(true)} title="Réglages">⚙</button>
-        </div>
+        <span className="tbside tbdroite gold">◆ {fmtM(run.gold)}</span>
       </div>
       <Scene G={G} />
+      <div className="tabsbar">
+        {[["boutique", "Boutique"], ["stances", "Stances"], ["equip", "Équipement"], ["best", "Bestiaire"]].map(([id, nom]) => (
+          <button key={id} className={"tabbtn" + (tab === id ? " on" : "")} onClick={() => { setTab(id); if (id === "equip") { G.dropFlag = false; } }}>
+            {nom}{id === "equip" && G.dropFlag ? <span className="bulle" /> : null}
+          </button>
+        ))}
+      </div>
       <div className="colonnes">
         <div className="colG">
-          <div className="tabsbar">
-            {[["boutique", "Boutique"], ["stances", "Stances"], ["equip", "Équipement"], ["best", "Bestiaire"]].map(([id, nom]) => (
-              <button key={id} className={"tabbtn" + (tab === id ? " on" : "")} onClick={() => { setTab(id); if (id === "equip") { G.dropFlag = false; } }}>
-                {nom}{id === "equip" && G.dropFlag ? <span className="bulle" /> : null}
-              </button>
-            ))}
-          </div>
           <div className="panneau">
             {tab === "boutique" ? <TabBoutique G={G} maj={maj} /> : null}
             {tab === "stances" ? <TabStances G={G} maj={maj} /> : null}
@@ -2154,6 +2169,15 @@ export default function Transcendance() {
             <div className="loglist">
               {(G.log || []).length === 0 ? <div className="dim">Le combat commence…</div> : null}
               {(G.log || []).slice(-18).map((l) => <div key={l.id} style={{ color: l.col }}>{l.txt}</div>)}
+            </div>
+          </div>
+          <div className="panneau pcote">
+            <div className="ctitel">Commandes</div>
+            <div className="cmdcol">
+              <button className={"btn" + (G.meta.opts.autoRelance ? " on" : "")} title="AFK farm : relance automatiquement une run après la mort" onClick={() => { G.meta.opts.autoRelance = !G.meta.opts.autoRelance; G.saveNow = true; maj(); }}>⟳ AFK {G.meta.opts.autoRelance ? "· ACTIF" : ""}</button>
+              <button className={"btn" + (G.meta.opts.autoZone ? " on" : "")} title="Passe automatiquement à la zone suivante après le Gardien" onClick={() => { G.meta.opts.autoZone = !G.meta.opts.autoZone; G.saveNow = true; maj(); }}>⇉ ZONE {G.meta.opts.autoZone ? "· ACTIF" : ""}</button>
+              <EncaisserBtn G={G} maj={maj} />
+              <button className="btn" onClick={() => setOpts(true)}>⚙ PARAMÈTRES</button>
             </div>
           </div>
         </div>

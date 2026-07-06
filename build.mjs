@@ -33,7 +33,7 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="version" content="${VERSION}">
 <title>Transcendance</title>
-<style>html,body{margin:0;padding:0;background:#0d0f1e;min-height:100vh;}</style>
+<style>html,body{margin:0;padding:0;background:#0d0f1e;min-height:100vh;overflow-x:hidden;}</style>
 <script>
 (function(){
   if (window.storage) return;
