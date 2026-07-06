@@ -11,8 +11,14 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.2";
+const VERSION = "0.5.3";
 const CHANGELOG = [
+  { v: "0.5.3", date: "6 juillet 2026", titre: "Alignements au cordeau", points: [
+    "Journal de combat et Commandes intervertis : les 4 boutons en colonne à côté des stats, le journal en pleine largeur en dessous — et son bas s'aligne avec la fenêtre de gauche.",
+    "Plus de trou à droite : les fenêtres se partagent toute la largeur de l'écran.",
+    "Notifications compactées : tout tient à l'écran, sans défilement.",
+    "Tokens : chiffre et libellé agrandis, icône alignée.",
+  ] },
   { v: "0.5.2", date: "6 juillet 2026", titre: "Fenêtre de notifications & finitions", points: [
     "Les notifications ne flottent plus au milieu de l'écran : elles ont leur fenêtre dédiée en bas, sur toute la largeur, avec historique.",
     "Statistiques de combat et Journal de combat : même hauteur, plus larges ; la fenêtre Commandes s'étend sous les deux.",
@@ -1900,7 +1906,7 @@ const CSS = `
 .pip.cur{ animation:pulse 1.1s infinite; border-color:var(--cyan); }
 .gear{ background:none; border:none; color:var(--dim); font-size:17px; cursor:pointer; padding:2px 4px; }
 .gear:hover{ color:var(--txt); }
-.scene{ position:relative; height:220px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
+.scene{ position:relative; height:200px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
   background:linear-gradient(#2e3a68 0%, #232b52 42%, #1a2138 100%);
   display:flex; align-items:flex-end; justify-content:space-between; padding:0 4%; }
 .treeline{ position:absolute; left:-2%; right:-2%; bottom:30px; height:88px; background:#1e3326; opacity:.9;
@@ -2019,31 +2025,32 @@ const CSS = `
 .jeff,.jsrc,.invstats,.slotvide{ color:#c3cdec; }
 .jauge{ margin-bottom:8px; }
 .panneau{ padding:10px 12px; }
-.jauge,.note,.grid2{ max-width:1080px; }
-.colonnes{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:start; }
+.toast{ padding:5px 9px; font-size:14px; }
+.titre{ font-size:20px; letter-spacing:5px; } .stitre{ font-size:9px; }
+.colonnes{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(380px,0.9fr); gap:8px; align-items:stretch; }
 .colG{ display:flex; flex-direction:column; gap:8px; min-width:0; }
-.colcote{ position:sticky; top:8px; }
-.zoneDroite{ display:grid; grid-template-columns:330px 400px; gap:8px; align-items:stretch; }
+.colG .panneau{ flex:1; }
+.zoneDroite{ display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto minmax(0,1fr); gap:8px; align-items:stretch; }
 .pcote{ min-height:0; }
-.pstats,.pjournal{ height:460px; display:flex; flex-direction:column; overflow:hidden; }
-.pstats{ overflow-y:auto; }
-.pcmd{ grid-column:1 / -1; }
+.pstats{ display:flex; flex-direction:column; overflow-y:auto; }
+.zoneDroite .chips{ flex-wrap:wrap; overflow:visible; }
+.pcmd .cmdcol{ display:flex; flex-direction:column; gap:8px; }
+.pjournal{ grid-column:1 / -1; display:flex; flex-direction:column; min-height:170px; overflow:hidden; }
 .pnotifs{ width:100%; }
-.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:118px; overflow-y:auto; }
+.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:86px; overflow-y:auto; }
 .ctitel{ font-size:14px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:9px; }
 .statcol{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .statcol .schip{ display:flex; justify-content:space-between; align-items:baseline; }
 .colM .chips{ flex-wrap:wrap; overflow:visible; }
 .loglist{ display:flex; flex-direction:column; gap:4px; font-size:15px; flex:1; min-height:0; overflow-y:auto; }
 .loglist div{ text-shadow:1px 1px 0 #000; }
-.cmdcol{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-.cmdcol .btn{ width:100%; text-align:center; padding:9px 10px; }
+.cmdcol .btn{ width:100%; text-align:center; padding:10px; }
 .topbar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
 .tbcentre{ display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; }
-.tbside{ font-size:20px; font-weight:700; }
-.tbside .pend{ font-size:16px; }
-.tbdim{ font-size:14px; color:var(--dim); font-weight:500; }
-.tbdroite{ text-align:right; }
+.tbside{ font-size:22px; font-weight:700; display:flex; align-items:center; gap:7px; }
+.tbside .pend{ font-size:18px; margin-left:0; }
+.tbdim{ font-size:16px; color:var(--dim); font-weight:500; }
+.tbdroite{ justify-content:flex-end; }
 .slottag{ font-size:11px; text-transform:uppercase; letter-spacing:.5px; border:1px solid var(--line); border-radius:4px; padding:1px 6px; font-family:'Cinzel', Georgia, serif; }
 .vendrow{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
 .togline{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
@@ -2176,13 +2183,6 @@ export default function Transcendance() {
               ))}
             </div>
           </div>
-          <div className="panneau pcote pjournal">
-            <div className="ctitel">Journal de combat</div>
-            <div className="loglist">
-              {(G.log || []).length === 0 ? <div className="dim">Le combat commence…</div> : null}
-              {(G.log || []).slice(-18).map((l) => <div key={l.id} style={{ color: l.col }}>{l.txt}</div>)}
-            </div>
-          </div>
           <div className="panneau pcmd">
             <div className="ctitel">Commandes</div>
             <div className="cmdcol">
@@ -2190,6 +2190,13 @@ export default function Transcendance() {
               <button className={"btn" + (G.meta.opts.autoZone ? " on" : "")} title="Passe automatiquement à la zone suivante après le Gardien" onClick={() => { G.meta.opts.autoZone = !G.meta.opts.autoZone; G.saveNow = true; maj(); }}>⇉ ZONE {G.meta.opts.autoZone ? "· ACTIF" : ""}</button>
               <EncaisserBtn G={G} maj={maj} />
               <button className="btn" onClick={() => setOpts(true)}>⚙ PARAMÈTRES</button>
+            </div>
+          </div>
+          <div className="panneau pjournal">
+            <div className="ctitel">Journal de combat</div>
+            <div className="loglist">
+              {(G.log || []).length === 0 ? <div className="dim">Le combat commence…</div> : null}
+              {(G.log || []).slice(-18).map((l) => <div key={l.id} style={{ color: l.col }}>{l.txt}</div>)}
             </div>
           </div>
         </div>
