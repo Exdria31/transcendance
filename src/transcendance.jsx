@@ -11,8 +11,12 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.3";
+const VERSION = "0.5.4";
 const CHANGELOG = [
+  { v: "0.5.4", date: "7 juillet 2026", titre: "Jauges XXL", points: [
+    "Les jauges méta sont deux fois plus hautes, les chiffres dessus enfin lisibles, et la fenêtre est bien remplie.",
+    "Toutes les écritures passent en blanc et en gras — terminé le texte fantôme pénible à lire.",
+  ] },
   { v: "0.5.3", date: "6 juillet 2026", titre: "Alignements au cordeau", points: [
     "Journal de combat et Commandes intervertis : les 4 boutons en colonne à côté des stats, le journal en pleine largeur en dessous — et son bas s'aligne avec la fenêtre de gauche.",
     "Plus de trou à droite : les fenêtres se partagent toute la largeur de l'écran.",
@@ -1538,7 +1542,7 @@ function TabJauges({ G }) {
               {pend > 0 ? <span className="pend">+{pend} palier{pend > 1 ? "s" : ""} en attente</span> : null}
               <span className="jpal" style={{ color: g.col }}>palier {gs.applied}{pend > 0 ? " → " + t : ""}</span>
             </div>
-            <Bar v={gs.total - deja} max={prochain - deja} col={g.col} h={12} glow={pend > 0} txt={F(gs.total - deja) + " / " + F(prochain - deja)} />
+            <Bar v={gs.total - deja} max={prochain - deja} col={g.col} h={24} glow={pend > 0} txt={F(gs.total - deja) + " / " + F(prochain - deja)} />
             <div className="jeff">{g.eff} — actif : <b style={{ color: g.col }}>{g.rabais ? "−" + (100 * (1 - Math.pow(0.99, gs.applied))).toFixed(1).replace(".", ",") + "%" : "+" + (gs.applied * g.par).toString().replace(".", ",") + "%"}</b>{g.id === "fortune" ? <span className="dim"> · or de la run en attente : +{fmtM(G.run.gold)}</span> : null}</div>
           </div>
         );
@@ -1884,9 +1888,9 @@ function EncaisserBtn({ G, maj }) {
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
-.trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#ffffff; --dim:#bfc9ea; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
+.trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#ffffff; --dim:#ccd6f4; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
   background: radial-gradient(1200px 500px at 50% -10%, #2a3358 0%, #161b2e 60%), #161b2e;
-  color:var(--txt); font-family:'Cormorant Garamond', Georgia, serif; font-size:17px; font-weight:500; line-height:1.35;
+  color:var(--txt); font-family:'Cormorant Garamond', Georgia, serif; font-size:17px; font-weight:600; line-height:1.35;
   min-height:100vh; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box; overflow-x:clip; }
 .trx *{ box-sizing:border-box; }
 .trx b{ font-weight:700; }
@@ -2016,13 +2020,17 @@ const CSS = `
 .titre{ font-size:24px; } .mtitre{ font-size:20px; } .tabbtn{ font-size:15px; letter-spacing:1px; } .pname{ font-size:12px; } .btn.big{ font-size:15px; }
 .cinfo{ font-size:15.5px; } .note{ font-size:15px; } .btn{ font-size:13.5px; } .schip{ font-size:16px; }
 .invnom{ font-size:16px; } .invstats{ font-size:14px; } .slotit{ font-size:14.5px; } .slotvide{ font-size:13.5px; } .slotnom{ font-size:11.5px; }
-.jhead{ font-size:15.5px; margin-bottom:2px; } .jsrc{ font-size:13.5px; } .jpal{ font-size:14.5px; } .jeff{ font-size:14px; margin-top:2px; } .niv{ font-size:13px; }
+.jhead{ font-size:19px; margin-bottom:4px; } .jsrc{ font-size:15.5px; } .jpal{ font-size:17px; font-weight:700; } .jeff{ font-size:16px; margin-top:4px; font-weight:600; } .niv{ font-size:13px; }
+.jnom{ font-weight:700; } .jauge{ margin-bottom:16px; }
+.jeff,.jsrc{ color:#e8edff; }
+.bartxt{ font-size:14px; font-weight:700; letter-spacing:.5px; }
+.pend{ font-size:13px; }
 .toast{ font-size:15px; } .bartxt{ font-size:11px; } .mgain{ font-size:15px; } .mstats{ font-size:15px; } .cinfo.sub{ font-size:14.5px; }
 .zlabel{ font-size:16px; } .chip{ font-size:14px; font-family:'Cormorant Garamond', Georgia, serif; font-weight:600; }
 .ta{ font-family:ui-monospace, 'Courier New', monospace; }
-.note{ background:rgba(0,0,0,.34); color:#dde3f8; margin:0 0 8px; }
-.schip{ color:#dde3f8; }
-.jeff,.jsrc,.invstats,.slotvide{ color:#c3cdec; }
+.note{ background:rgba(0,0,0,.34); color:#f0f3ff; margin:0 0 8px; }
+.schip{ color:#f0f3ff; }
+.invstats,.slotvide{ color:#dbe2fa; }
 .jauge{ margin-bottom:8px; }
 .panneau{ padding:10px 12px; }
 .toast{ padding:5px 9px; font-size:14px; }
