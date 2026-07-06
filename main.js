@@ -2,9 +2,7 @@ const { app, BrowserWindow, Menu, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
-/* Remplis ceci quand tu auras un hébergement (ex. GitHub Pages) :
-   const UPDATE_URL = "https://tonpseudo.github.io/transcendance/transcendance.html"; */
-const UPDATE_URL = "";
+const UPDATE_URL = "https://exdria31.github.io/transcendance/transcendance.html";
 
 const htmlTelecharge = () => path.join(app.getPath("userData"), "transcendance.html");
 
