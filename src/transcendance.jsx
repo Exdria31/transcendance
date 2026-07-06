@@ -11,8 +11,12 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.4";
+const VERSION = "0.5.5";
 const CHANGELOG = [
+  { v: "0.5.5", date: "7 juillet 2026", titre: "Une police qui se lit, enfin", points: [
+    "Les textes et les chiffres passent sur une police nette et moderne (Jost) — la précédente était élégante mais illisible sur fond sombre. Les titres gardent leur style FF13.",
+    "Les chiffres sur les barres ont maintenant un contour sombre : lisibles quel que soit le remplissage.",
+  ] },
   { v: "0.5.4", date: "7 juillet 2026", titre: "Jauges XXL", points: [
     "Les jauges méta sont deux fois plus hautes, les chiffres dessus enfin lisibles, et la fenêtre est bien remplie.",
     "Toutes les écritures passent en blanc et en gras — terminé le texte fantôme pénible à lire.",
@@ -1887,10 +1891,10 @@ function EncaisserBtn({ G, maj }) {
 }
 
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Jost:wght@400;500;600;700&display=swap');
 .trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#ffffff; --dim:#ccd6f4; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
   background: radial-gradient(1200px 500px at 50% -10%, #2a3358 0%, #161b2e 60%), #161b2e;
-  color:var(--txt); font-family:'Cormorant Garamond', Georgia, serif; font-size:17px; font-weight:600; line-height:1.35;
+  color:var(--txt); font-family:'Jost', 'Segoe UI', sans-serif; font-size:16px; font-weight:500; line-height:1.4;
   min-height:100vh; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box; overflow-x:clip; }
 .trx *{ box-sizing:border-box; }
 .trx b{ font-weight:700; }
@@ -2023,10 +2027,10 @@ const CSS = `
 .jhead{ font-size:19px; margin-bottom:4px; } .jsrc{ font-size:15.5px; } .jpal{ font-size:17px; font-weight:700; } .jeff{ font-size:16px; margin-top:4px; font-weight:600; } .niv{ font-size:13px; }
 .jnom{ font-weight:700; } .jauge{ margin-bottom:16px; }
 .jeff,.jsrc{ color:#e8edff; }
-.bartxt{ font-size:14px; font-weight:700; letter-spacing:.5px; }
+.bartxt{ font-size:15px; font-weight:700; letter-spacing:.6px; color:#fff; text-shadow:0 1px 2px #000, 0 0 5px #000, 1px 1px 0 #000; }
 .pend{ font-size:13px; }
 .toast{ font-size:15px; } .bartxt{ font-size:11px; } .mgain{ font-size:15px; } .mstats{ font-size:15px; } .cinfo.sub{ font-size:14.5px; }
-.zlabel{ font-size:16px; } .chip{ font-size:14px; font-family:'Cormorant Garamond', Georgia, serif; font-weight:600; }
+.zlabel{ font-size:16px; } .chip{ font-size:13.5px; font-family:'Jost', 'Segoe UI', sans-serif; font-weight:600; }
 .ta{ font-family:ui-monospace, 'Courier New', monospace; }
 .note{ background:rgba(0,0,0,.34); color:#f0f3ff; margin:0 0 8px; }
 .schip{ color:#f0f3ff; }
