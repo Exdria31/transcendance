@@ -21,9 +21,14 @@ Die & retry avec jauges méta, 3 zones × 10 niveaux, bestiaire, stances, équip
 - À chaque version : ajouter une entrée EN TÊTE de `CHANGELOG` (dans le jsx) —
   la popup « Nouveautés » s'affiche automatiquement chez les joueurs dont
   `meta.versionVue` est antérieure.
-- Release : commit + tag `vX.Y.Z` + push. GitHub Pages sert `transcendance.html` ;
-  le bouton « Mettre à jour le jeu » de l'exe télécharge cette page (UPDATE_URL
-  dans main.js) puis recharge — la popup Nouveautés fait le reste.
+- Release : commit + tag `vX.Y.Z` + `git push origin master --tags`. GitHub Pages
+  (repo Exdria31/transcendance, branche master) sert `transcendance.html` ; le bouton
+  « Mettre à jour le jeu » de l'exe télécharge cette page (UPDATE_URL dans main.js)
+  puis recharge — la popup Nouveautés fait le reste. Un push de transcendance.html
+  suffit donc à mettre à jour tous les joueurs ; ne re-publier un exe
+  (`npm run dist` + `gh release create vX.Y.Z "dist\Transcendance X.Y.Z.exe"`)
+  que si la coquille (main.js/preload.js) change. gh est dans
+  `C:\Program Files\GitHub CLI\gh.exe` (pas toujours dans le PATH).
 - Ne pas retirer `"overrides": { "yauzl": ... }` de package.json : il contourne
   une régression Node 24.16+ qui casse silencieusement l'install d'Electron.
 
