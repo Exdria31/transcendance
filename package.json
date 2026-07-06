@@ -1,0 +1,29 @@
+{
+  "name": "transcendance",
+  "productName": "Transcendance",
+  "version": "0.3.0",
+  "description": "Idle roguelite — die & retry, jauges de transcendance",
+  "main": "main.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "npm run build && electron .",
+    "dist": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "overrides": {
+    "yauzl": "^3.3.1"
+  },
+  "build": {
+    "appId": "fr.exdria.transcendance",
+    "files": ["main.js", "preload.js", "transcendance.html"],
+    "win": { "target": ["portable"] }
+  }
+}
