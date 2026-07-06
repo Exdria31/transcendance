@@ -11,8 +11,14 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.1";
+const VERSION = "0.5.2";
 const CHANGELOG = [
+  { v: "0.5.2", date: "6 juillet 2026", titre: "Fenêtre de notifications & finitions", points: [
+    "Les notifications ne flottent plus au milieu de l'écran : elles ont leur fenêtre dédiée en bas, sur toute la largeur, avec historique.",
+    "Statistiques de combat et Journal de combat : même hauteur, plus larges ; la fenêtre Commandes s'étend sous les deux.",
+    "Textes en blanc pur — le contraste ne pique plus les yeux.",
+    "Le compteur de tokens en attente (+x) est enfin lisible.",
+  ] },
   { v: "0.5.1", date: "6 juillet 2026", titre: "Lisibilité & agencement peaufinés", points: [
     "Textes nettement plus grands et plus contrastés — fini de plisser les yeux.",
     "Plus aucun débordement : le jeu tient dans l'écran, sans barre de défilement.",
@@ -1057,7 +1063,7 @@ function addFloat(G, txt, cls, side) {
   G.floats.push({ id: uid(), txt, cls, side, x: 8 + R() * 44, t: G.now });
   if (G.floats.length > 24) G.floats.splice(0, G.floats.length - 24);
 }
-function toast(G, txt, col) { G.toasts.push({ id: uid(), txt, col: col || "#f6f2ff", t: G.now }); if (G.toasts.length > 4) G.toasts.shift(); }
+function toast(G, txt, col) { G.toasts.push({ id: uid(), txt, col: col || "#f6f2ff", t: G.now }); if (G.toasts.length > 30) G.toasts.shift(); }
 function log(G, txt, col) { if (!G.log) G.log = []; G.log.push({ id: uid(), txt, col: col || "#eef0ff" }); if (G.log.length > 30) G.log.shift(); }
 
 function rollDrop(G, mon) {
@@ -1872,7 +1878,7 @@ function EncaisserBtn({ G, maj }) {
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
-.trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#f2f4ff; --dim:#aeb8dc; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
+.trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#ffffff; --dim:#bfc9ea; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
   background: radial-gradient(1200px 500px at 50% -10%, #2a3358 0%, #161b2e 60%), #161b2e;
   color:var(--txt); font-family:'Cormorant Garamond', Georgia, serif; font-size:17px; font-weight:500; line-height:1.35;
   min-height:100vh; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box; overflow-x:clip; }
@@ -2008,33 +2014,42 @@ const CSS = `
 .toast{ font-size:15px; } .bartxt{ font-size:11px; } .mgain{ font-size:15px; } .mstats{ font-size:15px; } .cinfo.sub{ font-size:14.5px; }
 .zlabel{ font-size:16px; } .chip{ font-size:14px; font-family:'Cormorant Garamond', Georgia, serif; font-weight:600; }
 .ta{ font-family:ui-monospace, 'Courier New', monospace; }
-.note{ background:rgba(0,0,0,.34); color:#c6cdea; margin:0 0 8px; }
+.note{ background:rgba(0,0,0,.34); color:#dde3f8; margin:0 0 8px; }
+.schip{ color:#dde3f8; }
+.jeff,.jsrc,.invstats,.slotvide{ color:#c3cdec; }
 .jauge{ margin-bottom:8px; }
 .panneau{ padding:10px 12px; }
 .jauge,.note,.grid2{ max-width:1080px; }
-.colonnes{ display:grid; grid-template-columns:minmax(0,1fr) 300px 340px; gap:8px; align-items:start; }
+.colonnes{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:start; }
 .colG{ display:flex; flex-direction:column; gap:8px; min-width:0; }
-.colcote{ position:sticky; top:8px; display:flex; flex-direction:column; gap:8px; }
+.colcote{ position:sticky; top:8px; }
+.zoneDroite{ display:grid; grid-template-columns:330px 400px; gap:8px; align-items:stretch; }
 .pcote{ min-height:0; }
+.pstats,.pjournal{ height:460px; display:flex; flex-direction:column; overflow:hidden; }
+.pstats{ overflow-y:auto; }
+.pcmd{ grid-column:1 / -1; }
+.pnotifs{ width:100%; }
+.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:118px; overflow-y:auto; }
 .ctitel{ font-size:14px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:9px; }
 .statcol{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .statcol .schip{ display:flex; justify-content:space-between; align-items:baseline; }
 .colM .chips{ flex-wrap:wrap; overflow:visible; }
-.loglist{ display:flex; flex-direction:column; gap:4px; font-size:15px; max-height:400px; overflow-y:auto; }
+.loglist{ display:flex; flex-direction:column; gap:4px; font-size:15px; flex:1; min-height:0; overflow-y:auto; }
 .loglist div{ text-shadow:1px 1px 0 #000; }
-.cmdcol{ display:flex; flex-direction:column; gap:7px; }
+.cmdcol{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
 .cmdcol .btn{ width:100%; text-align:center; padding:9px 10px; }
 .topbar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
 .tbcentre{ display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; }
 .tbside{ font-size:20px; font-weight:700; }
-.tbdim{ font-size:13px; color:var(--dim); font-weight:500; }
+.tbside .pend{ font-size:16px; }
+.tbdim{ font-size:14px; color:var(--dim); font-weight:500; }
 .tbdroite{ text-align:right; }
 .slottag{ font-size:11px; text-transform:uppercase; letter-spacing:.5px; border:1px solid var(--line); border-radius:4px; padding:1px 6px; font-family:'Cinzel', Georgia, serif; }
 .vendrow{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
 .togline{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
 .numin{ width:76px; background:#12162a; border:2px solid var(--line); border-radius:6px; color:var(--txt); padding:3px 6px; font-family:inherit; font-size:15px; }
-@media (max-width:1220px){ .colonnes{ grid-template-columns:minmax(0,1fr) 270px; } .colD{ grid-column:1 / -1; position:static; } .loglist{ max-height:180px; } }
-@media (max-width:880px){ .colonnes{ grid-template-columns:1fr; } .colcote{ position:static; } }
+@media (max-width:1560px){ .zoneDroite{ grid-template-columns:280px 330px; } }
+@media (max-width:1200px){ .colonnes{ grid-template-columns:1fr; } .colcote{ position:static; } .zoneDroite{ grid-template-columns:1fr 1fr; } .pstats,.pjournal{ height:330px; } }
 .panneau{ border-radius:16px; background:rgba(26,29,50,.92); }
 .carte{ border-radius:14px; } .btn{ border-radius:10px; } .topbar{ border-radius:14px; background:rgba(26,29,50,.92); }
 .scene{ border-radius:18px; border-color:#4a5178; }
@@ -2090,7 +2105,6 @@ export default function Transcendance() {
       const v = G.meta.opts.vitesse || 1;
       for (let i = 0; i < v; i++) tick(G, 0.1);
       G.floats = G.floats.filter((f) => G.now - f.t < 900);
-      G.toasts = G.toasts.filter((f) => G.now - f.t < 2600);
       if (G.run.over && G.meta.opts.autoRelance && G.now - (G.run.overT || 0) > 1600) {
         const gg = G.run.gains || { paliers: [], tokens: 0 };
         toast(G, "Auto-relance · +" + gg.paliers.length + " palier(s) · +" + gg.tokens + " ⬡", "#8be05f");
@@ -2141,8 +2155,8 @@ export default function Transcendance() {
             {tab === "best" ? <TabBestiaire G={G} maj={maj} /> : null}
           </div>
         </div>
-        <div className="colM colcote">
-          <div className="panneau pcote">
+        <div className="zoneDroite colcote">
+          <div className="panneau pcote pstats">
             <div className="ctitel">Statistiques de combat</div>
             <div className="statcol">
               <span className="schip">⚔ ATQ <b>{fmt(st.atk)}</b></span>
@@ -2162,16 +2176,14 @@ export default function Transcendance() {
               ))}
             </div>
           </div>
-        </div>
-        <div className="colD colcote">
-          <div className="panneau pcote">
+          <div className="panneau pcote pjournal">
             <div className="ctitel">Journal de combat</div>
             <div className="loglist">
               {(G.log || []).length === 0 ? <div className="dim">Le combat commence…</div> : null}
               {(G.log || []).slice(-18).map((l) => <div key={l.id} style={{ color: l.col }}>{l.txt}</div>)}
             </div>
           </div>
-          <div className="panneau pcote">
+          <div className="panneau pcmd">
             <div className="ctitel">Commandes</div>
             <div className="cmdcol">
               <button className={"btn" + (G.meta.opts.autoRelance ? " on" : "")} title="AFK farm : relance automatiquement une run après la mort" onClick={() => { G.meta.opts.autoRelance = !G.meta.opts.autoRelance; G.saveNow = true; maj(); }}>⟳ AFK {G.meta.opts.autoRelance ? "· ACTIF" : ""}</button>
@@ -2182,8 +2194,12 @@ export default function Transcendance() {
           </div>
         </div>
       </div>
-      <div className="toasts">
-        {G.toasts.map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
+      <div className="panneau pnotifs">
+        <div className="ctitel">Notifications</div>
+        <div className="notiflist">
+          {G.toasts.length === 0 ? <div className="dim">Rien à signaler pour l'instant.</div> : null}
+          {G.toasts.slice(-10).reverse().map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
+        </div>
       </div>
       {!G.meta.opts.autoRelance ? <ModaleFin G={G} maj={maj} /> : null}
       {opts ? <ModaleOpts G={G} fermer={() => setOpts(false)} maj={maj} voirNotes={() => { setOpts(false); setNotes(true); }} /> : null}
