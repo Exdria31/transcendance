@@ -36,6 +36,19 @@ function creerFenetre() {
   });
 }
 
+/* Vérification silencieuse au lancement : renvoie la version disponible en ligne
+   (lue dans la balise <meta name="version"> de la page hébergée). */
+ipcMain.handle("verif-maj", async () => {
+  if (!UPDATE_URL) return { ok: false, msg: "Pas d'URL de mise à jour configurée" };
+  try {
+    const rep = await fetch(UPDATE_URL + "?t=" + Date.now());
+    if (!rep.ok) return { ok: false, msg: "Serveur : " + rep.status };
+    const m = (await rep.text()).match(/<meta name="version" content="([^"]+)"/);
+    if (!m) return { ok: false, msg: "Version distante introuvable" };
+    return { ok: true, version: m[1] };
+  } catch (e) { return { ok: false, msg: "Réseau : " + e.message }; }
+});
+
 /* Bouton "Mettre à jour le jeu" (⚙ Réglages) : télécharge la dernière version. */
 ipcMain.handle("maj-jeu", async () => {
   if (!UPDATE_URL) return { ok: false, msg: "Pas d'URL de mise à jour configurée (voir main.js)" };

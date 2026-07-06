@@ -11,8 +11,11 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.4.0";
+const VERSION = "0.4.1";
 const CHANGELOG = [
+  { v: "0.4.1", date: "6 juillet 2026", titre: "La mise à jour vient à toi", points: [
+    "Au lancement, l'application vérifie toute seule si une nouvelle version existe et te propose de l'installer — tu peux toujours refuser et le faire plus tard.",
+  ] },
   { v: "0.4.0", date: "6 juillet 2026", titre: "Le jeu apprend à se mettre à jour", points: [
     "Le jeu a maintenant un numéro de version, visible dans les Réglages.",
     "Cette fenêtre de nouveautés s'affiche après chaque mise à jour — tu ne rateras plus rien.",
@@ -1644,6 +1647,25 @@ function ModaleNouveautes({ G, fermer }) {
   );
 }
 
+function ModaleMaj({ G, version, fermer, maj }) {
+  const [enCours, setEnCours] = useState(false);
+  return (
+    <div className="voile">
+      <div className="modale">
+        <div className="mtitre" style={{ color: "#6ad4ff" }}>MISE À JOUR DISPONIBLE</div>
+        <div className="cinfo">La version <b>v{version}</b> est sortie <span className="dim">(tu joues en v{VERSION})</span>.</div>
+        <p className="note">La mise à jour prend quelques secondes et conserve ta sauvegarde. Les nouveautés s'afficheront juste après.</p>
+        <button className="btn big" disabled={enCours} onClick={async () => {
+          setEnCours(true); maj();
+          try { const r = await window.majJeu(); if (r && !r.ok) { toast(G, r.msg || "Mise à jour impossible", "#ff6b6b"); setEnCours(false); maj(); } }
+          catch (e) { toast(G, "Mise à jour impossible", "#ff6b6b"); setEnCours(false); maj(); }
+        }}>{enCours ? "TÉLÉCHARGEMENT…" : "METTRE À JOUR MAINTENANT"}</button>
+        <button className="btn ghost" disabled={enCours} onClick={fermer}>Plus tard</button>
+      </div>
+    </div>
+  );
+}
+
 function ModaleOpts({ G, fermer, maj, voirNotes }) {
   const [io, setIo] = useState("");
   const [exp, setExp] = useState("");
@@ -1858,6 +1880,7 @@ export default function Transcendance() {
   const [sel, setSel] = useState(null);
   const [opts, setOpts] = useState(false);
   const [notes, setNotes] = useState(false);
+  const [majDispo, setMajDispo] = useState(null);
   const [pret, setPret] = useState(false);
   const lastSave = useRef(0);
 
@@ -1870,6 +1893,9 @@ export default function Transcendance() {
       Gref.current.st = heroStats(Gref.current);
       if (cmpVer(VERSION, r.meta.versionVue) > 0) setNotes(true);
       setPret(true);
+      if (typeof window !== "undefined" && window.verifMaj && window.majJeu) {
+        window.verifMaj().then((v) => { if (!mort && v && v.ok && cmpVer(v.version, VERSION) > 0) setMajDispo(v.version); }).catch(() => {});
+      }
     });
     return () => { mort = true; };
   }, []);
@@ -1960,6 +1986,7 @@ export default function Transcendance() {
       {!G.meta.opts.autoRelance ? <ModaleFin G={G} maj={maj} /> : null}
       {opts ? <ModaleOpts G={G} fermer={() => setOpts(false)} maj={maj} voirNotes={() => { setOpts(false); setNotes(true); }} /> : null}
       {notes ? <ModaleNouveautes G={G} fermer={() => { G.meta.versionVue = VERSION; G.saveNow = true; setNotes(false); }} /> : null}
+      {majDispo && !notes ? <ModaleMaj G={G} version={majDispo} fermer={() => setMajDispo(null)} maj={maj} /> : null}
     </div>
   );
 }

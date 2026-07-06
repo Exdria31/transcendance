@@ -22,11 +22,16 @@ await build({
   outfile: ".build/bundle.js",
 });
 const bundle = readFileSync(".build/bundle.js", "utf8");
+/* La version est extraite du jsx (source de vérité) et exposée dans une balise
+   <meta> — c'est elle que l'exe lit pour savoir si une mise à jour existe. */
+const mVer = readFileSync("src/transcendance.jsx", "utf8").match(/const VERSION = "([^"]+)"/);
+const VERSION = mVer ? mVer[1] : "0.0.0";
 const html = `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="version" content="${VERSION}">
 <title>Transcendance</title>
 <style>html,body{margin:0;padding:0;background:#0d0f1e;min-height:100vh;}</style>
 <script>
