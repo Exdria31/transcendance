@@ -14,6 +14,19 @@ Die & retry avec jauges méta, 3 zones × 10 niveaux, bestiaire, stances, équip
 - Sprites : grilles de chaînes (1 char = 1 pixel), toutes les rangées d'une
   grille doivent avoir la même longueur, chaque char doit exister dans la palette `p`.
 
+## Versions & mises à jour
+- Source de vérité : `const VERSION` dans `src/transcendance.jsx` ; garder
+  `"version"` de package.json synchronisé.
+- Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
+- À chaque version : ajouter une entrée EN TÊTE de `CHANGELOG` (dans le jsx) —
+  la popup « Nouveautés » s'affiche automatiquement chez les joueurs dont
+  `meta.versionVue` est antérieure.
+- Release : commit + tag `vX.Y.Z` + push. GitHub Pages sert `transcendance.html` ;
+  le bouton « Mettre à jour le jeu » de l'exe télécharge cette page (UPDATE_URL
+  dans main.js) puis recharge — la popup Nouveautés fait le reste.
+- Ne pas retirer `"overrides": { "yauzl": ... }` de package.json : il contourne
+  une régression Node 24.16+ qui casse silencieusement l'install d'Electron.
+
 ## Commandes
 - `npm run build`  → régénère transcendance.html (à faire après chaque modif)
 - `npm start`      → build + fenêtre Electron de test

@@ -6,6 +6,29 @@ import React, { useState, useEffect, useRef } from "react";
    bestiaire-scaling, stances, équipement persistant.
    ============================================================ */
 
+/* ---------- version & nouveautés ----------
+   VERSION est la source de vérité (garder package.json synchronisé).
+   Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
+   À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
+   « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
+const VERSION = "0.4.0";
+const CHANGELOG = [
+  { v: "0.4.0", date: "6 juillet 2026", titre: "Le jeu apprend à se mettre à jour", points: [
+    "Le jeu a maintenant un numéro de version, visible dans les Réglages.",
+    "Cette fenêtre de nouveautés s'affiche après chaque mise à jour — tu ne rateras plus rien.",
+    "Dans l'application de bureau, le bouton « Mettre à jour le jeu » (Réglages) récupère la dernière version en ligne.",
+  ] },
+  { v: "0.3.0", date: "juin 2026", titre: "La base du monde", points: [
+    "3 zones × 10 niveaux : Forêt, Désert, Océan, chacune gardée par son Gardien.",
+    "Bestiaire, stances, équipement persistant et jauges de transcendance.",
+  ] },
+];
+function cmpVer(a, b) {
+  const pa = String(a || "0").split("."), pb = String(b || "0").split(".");
+  for (let i = 0; i < 3; i++) { const d = (parseInt(pa[i], 10) || 0) - (parseInt(pb[i], 10) || 0); if (d) return d; }
+  return 0;
+}
+
 const BAL = {
   hero: { atk: 10, hp: 100, as: 1.0, critC: 5, critD: 150 },
   mob:  { hp: 30, hpG: 1.36, atk: 3.2, atkG: 1.27, gold: 7, goldG: 1.31, as: 0.8 },
@@ -903,6 +926,7 @@ function metaInitiale() {
     inv: [],
     vie: { runs: 0, meilleure: 0, kills: 0, or: 0 },
     opts: { sfx: true, vitesse: 1, autoZone: true, autoRelance: false },
+    versionVue: VERSION,
   };
 }
 function runInitiale() {
@@ -1213,6 +1237,7 @@ function depuisSave(d) {
     for (const k in meta.stances) if (d.meta.stances && d.meta.stances[k]) Object.assign(meta.stances[k], d.meta.stances[k]);
     for (const k in meta.best) if (d.meta.best && typeof d.meta.best[k] === "number") meta.best[k] = d.meta.best[k];
     for (const k in meta.equip) if (d.meta.equip && d.meta.equip[k]) meta.equip[k] = d.meta.equip[k];
+    meta.versionVue = typeof d.meta.versionVue === "string" ? d.meta.versionVue : "0.3.0";
     let mx = 0; meta.inv.forEach((i) => { mx = Math.max(mx, i.id || 0); });
     for (const k in meta.equip) if (meta.equip[k]) mx = Math.max(mx, meta.equip[k].id || 0);
     UID = mx + 1;
@@ -1599,7 +1624,27 @@ function ModaleFin({ G, maj }) {
   );
 }
 
-function ModaleOpts({ G, fermer, maj }) {
+function ModaleNouveautes({ G, fermer }) {
+  const notes = CHANGELOG.filter((c) => cmpVer(c.v, G.meta.versionVue) > 0);
+  const liste = notes.length > 0 ? notes : CHANGELOG.slice(0, 1);
+  return (
+    <div className="voile" onClick={fermer}>
+      <div className="modale" onClick={(e) => e.stopPropagation()}>
+        <div className="mtitre" style={{ color: "#c59bff" }}>NOUVEAUTÉS</div>
+        <div className="cinfo dim">Transcendance v{VERSION}</div>
+        {liste.map((c) => (
+          <div key={c.v}>
+            <div className="msep">v{c.v} · {c.date} — {c.titre}</div>
+            {c.points.map((p, i) => <div key={i} className="mgain">• {p}</div>)}
+          </div>
+        ))}
+        <button className="btn big" onClick={fermer}>C'EST PARTI !</button>
+      </div>
+    </div>
+  );
+}
+
+function ModaleOpts({ G, fermer, maj, voirNotes }) {
   const [io, setIo] = useState("");
   const [exp, setExp] = useState("");
   const [conf, setConf] = useState(false);
@@ -1608,6 +1653,7 @@ function ModaleOpts({ G, fermer, maj }) {
     <div className="voile" onClick={fermer}>
       <div className="modale" onClick={(e) => e.stopPropagation()}>
         <div className="mtitre" style={{ color: "#6ad4ff" }}>RÉGLAGES</div>
+        <div className="cinfo">Version <b>v{VERSION}</b> <button className="btn mini ghost" onClick={voirNotes}>Nouveautés</button></div>
         <div className="cinfo">Vitesse <span className="dim">(mode test — pour valider la boucle sans attendre)</span></div>
         <div className="crow">{[1, 2, 5].map((v) => <button key={v} className={"btn" + (o.vitesse === v ? " on" : "")} onClick={() => { o.vitesse = v; maj(); }}>{v}×</button>)}</div>
         <div className="crow"><button className={"btn" + (o.sfx ? " on" : "")} onClick={() => { o.sfx = !o.sfx; G.saveNow = true; maj(); }}>Sons : {o.sfx ? "OUI" : "NON"}</button></div>
@@ -1811,6 +1857,7 @@ export default function Transcendance() {
   const [tab, setTab] = useState("boutique");
   const [sel, setSel] = useState(null);
   const [opts, setOpts] = useState(false);
+  const [notes, setNotes] = useState(false);
   const [pret, setPret] = useState(false);
   const lastSave = useRef(0);
 
@@ -1821,6 +1868,7 @@ export default function Transcendance() {
       const r = depuisSave(d);
       Gref.current = { meta: r.meta, run: r.run, st: null, floats: [], toasts: [], log: [], now: Date.now(), heroAtk: 0, monAtk: 0, saveNow: false, dropFlag: false };
       Gref.current.st = heroStats(Gref.current);
+      if (cmpVer(VERSION, r.meta.versionVue) > 0) setNotes(true);
       setPret(true);
     });
     return () => { mort = true; };
@@ -1854,7 +1902,7 @@ export default function Transcendance() {
       <style>{CSS}</style>
       <div>
         <div className="titre">TRANSCENDANCE</div>
-        <div className="stitre">prototype v1 — zone forêt</div>
+        <div className="stitre">idle roguelite — v{VERSION}</div>
       </div>
       <div className="topbar">
         <span className="zlabel">
@@ -1910,7 +1958,8 @@ export default function Transcendance() {
         {G.toasts.map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
       </div>
       {!G.meta.opts.autoRelance ? <ModaleFin G={G} maj={maj} /> : null}
-      {opts ? <ModaleOpts G={G} fermer={() => setOpts(false)} maj={maj} /> : null}
+      {opts ? <ModaleOpts G={G} fermer={() => setOpts(false)} maj={maj} voirNotes={() => { setOpts(false); setNotes(true); }} /> : null}
+      {notes ? <ModaleNouveautes G={G} fermer={() => { G.meta.versionVue = VERSION; G.saveNow = true; setNotes(false); }} /> : null}
     </div>
   );
 }
