@@ -11,8 +11,16 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 const CHANGELOG = [
+  { v: "0.7.0", date: "7 juillet 2026", titre: "La forge : affinage, tiers et nouvelles raretés", points: [
+    "La vente d'équipement ne rapporte plus d'or mais des ⚒ morceaux de ferraille, la nouvelle monnaie de forge.",
+    "Affinage : chaque objet peut être affiné 10 fois à la ferraille (+5% de stats par niveau), puis évoluer en Tier II et III — jusqu'à ×2,5 les stats de base.",
+    "✦ Essence résiduelle : lâchée par le Gardien de chaque zone (niveau 10/10), une seule fois par run et par zone — il faut relancer pour en récolter à nouveau. Elle paie les évolutions de Tier.",
+    "4 nouvelles raretés : Magique, Héroïque, Mythique et Divin. Un seul équipement Divin peut être porté… pour l'instant.",
+    "Verrouillage 🔒 : un objet verrouillé ne peut plus être vendu, ni à l'unité ni par les ventes de masse.",
+    "Clique sur un objet équipé pour l'affiner directement. Prochaine étape : la grande refonte visuelle de l'équipement (inventaire à cases, ensembles, priorités).",
+  ] },
   { v: "0.6.0", date: "7 juillet 2026", titre: "Le jeu s'adapte à ton écran", points: [
     "Mise à l'échelle automatique : le jeu détecte la taille de ta fenêtre et s'ajuste — plus de barres de défilement sur les petits écrans.",
     "Nouvelle section Graphismes dans les Paramètres : si l'automatique ne te convient pas, force l'échelle à 100 %, 90 %, 80 % ou 70 %, comme dans n'importe quel jeu.",
@@ -868,10 +876,14 @@ function tiersFromTotal(g, total) { let t = 0; while (cumReq(g, t + 1) <= total 
 
 /* ---------- équipement ---------- */
 const RARS = [
-  { id: "commun",     nom: "Commun",     col: "#b9c2d9", mult: 1.0, subs: 0, w: 62 },
-  { id: "rare",       nom: "Rare",       col: "#6ad4ff", mult: 1.35, subs: 1, w: 27 },
-  { id: "epique",     nom: "Épique",     col: "#c59bff", mult: 1.8, subs: 2, w: 9 },
-  { id: "legendaire", nom: "Légendaire", col: "#ffd45e", mult: 2.5, subs: 3, w: 2 },
+  { id: "commun",     nom: "Commun",     col: "#b9c2d9", mult: 1.0,  subs: 0, w: 46 },
+  { id: "magique",    nom: "Magique",    col: "#7aa2ff", mult: 1.15, subs: 1, w: 24 },
+  { id: "rare",       nom: "Rare",       col: "#6ad4ff", mult: 1.35, subs: 1, w: 14 },
+  { id: "heroique",   nom: "Héroïque",   col: "#58e0a0", mult: 1.55, subs: 2, w: 8 },
+  { id: "epique",     nom: "Épique",     col: "#c59bff", mult: 1.8,  subs: 2, w: 4.5 },
+  { id: "legendaire", nom: "Légendaire", col: "#ffd45e", mult: 2.2,  subs: 3, w: 2.2 },
+  { id: "mythique",   nom: "Mythique",   col: "#ff5fd0", mult: 2.8,  subs: 3, w: 1 },
+  { id: "divin",      nom: "Divin",      col: "#ffffff", mult: 3.6,  subs: 4, w: 0.3 },
 ];
 const RAR_BY_ID = Object.fromEntries(RARS.map((r) => [r.id, r]));
 /* stats: f=flat, p=pourcentage */
@@ -900,14 +912,20 @@ const slotsCibles = (sid) => TWINS[sid] || [sid];
 const SLOT_BY_ID = Object.fromEntries(SLOTS.map((s) => [s.id, s]));
 const NOM_ISTAT = { atkF: "ATQ", atkP: "% ATQ", hpF: "PV", hpP: "% PV", defF: "DÉF", asP: "% Vit. attaque", critC: "% Chance crit.", critD: "% Dégâts crit.", goldP: "% Or", vsBossP: "% Dégâts boss", gaugeP: "% Remplissage jauges" };
 const IBASE = { atkF: 5, atkP: 6, hpF: 24, hpP: 6, defF: 6, asP: 4, critC: 3, critD: 8, goldP: 6, vsBossP: 8, gaugeP: 6 };
-const PREFIX = { commun: ["Simple", "Usé", "Banal"], rare: ["Solide", "Affûté", "Poli"], epique: ["Sylvestre", "Runique", "Féroce"], legendaire: ["Mythique", "Ancestral", "Éclatant"] };
+const PREFIX = {
+  commun: ["Simple", "Usé", "Banal"], magique: ["Enchanté", "Imprégné", "Scintillant"],
+  rare: ["Solide", "Affûté", "Poli"], heroique: ["Vaillant", "Indomptable", "Glorieux"],
+  epique: ["Sylvestre", "Runique", "Féroce"], legendaire: ["Ancestral", "Éclatant", "Immémorial"],
+  mythique: ["Fabuleux", "Primordial", "Céleste"], divin: ["Divin", "Transcendant", "Absolu"],
+};
 const SUFFIX = ["du Loup", "des Racines", "du Frelon", "de l'Aube", "du Gardien", "des Spores", "de la Mousse", "du Crépuscule"];
 const pick = (a) => a[Math.floor(R() * a.length)];
 function rollRarity(ilvl) {
-  const bonus = Math.min(20, ilvl * 0.8);
-  const w = RARS.map((r, i) => r.w + (i > 0 ? bonus / (4 - i) : -bonus));
-  let s = w.reduce((a, b) => a + Math.max(1, b), 0), x = R() * s;
-  for (let i = 0; i < RARS.length; i++) { x -= Math.max(1, w[i]); if (x <= 0) return RARS[i]; }
+  /* Plus le niveau monte, plus les hautes raretés pèsent lourd (jusqu'à ×3 à haut niveau). */
+  const bonus = Math.min(3, 1 + ilvl * 0.045);
+  const w = RARS.map((r, i) => (i === 0 ? r.w / bonus : r.w * (1 + (bonus - 1) * (i / (RARS.length - 1)))));
+  let s = w.reduce((a, b) => a + b, 0), x = R() * s;
+  for (let i = 0; i < RARS.length; i++) { x -= w[i]; if (x <= 0) return RARS[i]; }
   return RARS[0];
 }
 function genItem(slotId, ilvl, forceRar) {
@@ -921,11 +939,41 @@ function genItem(slotId, ilvl, forceRar) {
     stats[st] = (stats[st] || 0) + Math.max(1, Math.round(IBASE[st] * scale * (0.6 + R() * 0.5)));
   }
   const baseNom = slot.base || slot.nom.split(" ")[0];
-  return { id: uid(), slot: slotId, rar: rar.id, ilvl, nom: pick(PREFIX[rar.id]) + " " + baseNom + " " + pick(SUFFIX), stats };
+  return { id: uid(), slot: slotId, rar: rar.id, ilvl, nom: pick(PREFIX[rar.id]) + " " + baseNom + " " + pick(SUFFIX), stats, t: 1, a: 0 };
+}
+/* ---------- affinage & tiers ----------
+   stats de base × (1 + 5% par niveau d'affinage cumulé sur les tiers) :
+   Tier I aff.10 = ×1,5 · Tier II aff.10 = ×2 · Tier III aff.10 = ×2,5. */
+const multAff = (it) => 1 + 0.05 * ((it.a || 0) + 10 * ((it.t || 1) - 1));
+function statsEff(it) { const m = multAff(it); if (m === 1) return it.stats; const o = {}; for (const k in it.stats) o[k] = Math.round(it.stats[k] * m); return o; }
+const coutAffinage = (it) => Math.max(1, Math.round(it.ilvl * RAR_BY_ID[it.rar].mult * (it.t || 1) * (1 + 0.3 * (it.a || 0))));
+function trouverItem(meta, id) {
+  const i = meta.inv.find((x) => x.id === id); if (i) return i;
+  for (const k in meta.equip) if (meta.equip[k] && meta.equip[k].id === id) return meta.equip[k];
+  return null;
+}
+function affiner(G, itemId) {
+  const meta = G.meta, it = trouverItem(meta, itemId);
+  if (!it || it.nv || (it.a || 0) >= 10) return;
+  const c = coutAffinage(it); if (meta.ferraille < c) return;
+  meta.ferraille -= c; it.a = (it.a || 0) + 1; it.t = it.t || 1;
+  sfx("tier", meta.opts.sfx); G.saveNow = true;
+}
+function evoluerTier(G, itemId) {
+  const meta = G.meta, it = trouverItem(meta, itemId);
+  if (!it || it.nv || (it.a || 0) < 10 || (it.t || 1) >= 3) return;
+  const c = it.t || 1; if (meta.essence < c) return;
+  meta.essence -= c; it.t = (it.t || 1) + 1; it.a = 0;
+  toast(G, it.nom + " évolue — Tier " + rome(it.t), RAR_BY_ID[it.rar].col);
+  sfx("boss", meta.opts.sfx); G.saveNow = true;
+}
+function basculerLock(G, itemId) {
+  const it = trouverItem(G.meta, itemId); if (!it || it.nv) return;
+  it.lock = !it.lock; sfx("equip", G.meta.opts.sfx); G.saveNow = true;
 }
 function equipTotals(meta) {
   const t = { atkF: 0, atkP: 0, hpF: 0, hpP: 0, defF: 0, asP: 0, critC: 0, critD: 0, goldP: 0, vsBossP: 0, gaugeP: 0 };
-  for (const sid in meta.equip) { const it = meta.equip[sid]; if (!it) continue; for (const k in it.stats) t[k] += it.stats[k]; }
+  for (const sid in meta.equip) { const it = meta.equip[sid]; if (!it) continue; const se = statsEff(it); for (const k in se) t[k] += se[k]; }
   return t;
 }
 
@@ -968,9 +1016,9 @@ function recyclable(meta, it) {
    Score pondéré par stat (valeur relative approximative d'un point de chaque
    stat) ; pour les slots jumeaux, les 2 meilleurs candidats sont répartis. */
 const POIDS_STAT = { atkF: 1, atkP: 2.2, hpF: 0.35, hpP: 1.6, defF: 1.2, asP: 2.0, critC: 2.2, critD: 1.1, goldP: 1.5, vsBossP: 0.8, gaugeP: 1.2 };
-function scoreItem(it) { let s = 0; for (const k in it.stats) s += (POIDS_STAT[k] || 1) * it.stats[k]; return s; }
+function scoreItem(it) { let s = 0; const se = statsEff(it); for (const k in se) s += (POIDS_STAT[k] || 1) * se[k]; return s; }
 function equiperMeilleur(G) {
-  const meta = G.meta; let changes = 0;
+  const meta = G.meta; let changes = 0, nbDivin = 0;
   const traites = new Set();
   SLOTS.filter((s) => !s.trans).forEach((s) => {
     const cibles = slotsCibles(s.id), key = cibles.join("+");
@@ -980,7 +1028,12 @@ function equiperMeilleur(G) {
     meta.inv.forEach((it) => { if (slotsCibles(it.slot).join("+") === key) cands.push(it); });
     if (!cands.length) return;
     cands.sort((a, b) => scoreItem(b) - scoreItem(a));
-    const top = cands.slice(0, cibles.length);
+    const top = [];
+    for (const c of cands) {
+      if (top.length >= cibles.length) break;
+      if (c.rar === "divin") { if (nbDivin >= 1) continue; nbDivin++; }
+      top.push(c);
+    }
     const topIds = new Set(top.map((t) => t.id));
     cibles.forEach((cid) => {
       const cur = meta.equip[cid];
@@ -1066,8 +1119,10 @@ function metaInitiale() {
     vie: { runs: 0, meilleure: 0, kills: 0, or: 0 },
     opts: { sfx: true, vitesse: 1, autoZone: true, autoRelance: false, echelle: "auto" },
     versionVue: VERSION,
-    recy: { on: false, rars: { commun: true, rare: false, epique: false, legendaire: false }, nivMax: 0, fams: { arme: true, anneau: true, boucle: true, amulette: true, armure: true, bottes: true, gants: true } },
+    recy: { on: false, rars: { commun: true, magique: false, rare: false, heroique: false, epique: false, legendaire: false, mythique: false, divin: false }, nivMax: 0, fams: { arme: true, anneau: true, boucle: true, amulette: true, armure: true, bottes: true, gants: true } },
     armeTChoix: null,
+    ferraille: 0,
+    essence: 0,
   };
 }
 function runInitiale() {
@@ -1075,7 +1130,7 @@ function runInitiale() {
     zoneIdx: 0, niveau: 1, nivZone: [1, 1, 1], debloque: 0, kills: 0, stance: "voyageur",
     lvlAtk: 0, lvlHp: 0, gold: 0, tokensPend: 0,
     hp: -1, mon: null, spawnT: BAL.spawn * 0.6, hG: 0, mG: 0,
-    over: false, morte: false, gains: null,
+    over: false, morte: false, gains: null, essences: [],
     stats: { kills: 0, or: 0, degats: 0, subis: 0 },
   };
 }
@@ -1144,17 +1199,19 @@ function rollDrop(G, mon) {
   const slotId = pick(SLOTS.filter((s) => !s.trans)).id;
   const it = genItem(slotId, G.run.zoneIdx * 10 + G.run.niveau + zTrans * 10, mon.def.type === "zone" && R() < 0.35 ? "legendaire" : null);
   if (recyclable(meta, it)) {
-    const v = prixVente(it); G.run.gold += v; G.run.stats.or += v;
-    log(G, "♻ Recyclé : " + it.nom + " · +" + fmtM(v), "#9aa3c7");
+    const v = prixFerraille(it); meta.ferraille += v;
+    log(G, "♻ Recyclé : " + it.nom + " · +" + fmt(v) + " ⚒", "#9aa3c7");
     return;
   }
   if (meta.inv.length >= 60) {
-    const v = prixVente(it); G.run.gold += v; G.run.stats.or += v;
-    toast(G, "Inventaire plein — " + it.nom + " vendu +" + fmtM(v), "#ffd45e");
+    const v = prixFerraille(it); meta.ferraille += v;
+    toast(G, "Inventaire plein — " + it.nom + " recyclé +" + fmt(v) + " ⚒", "#b9c2d9");
   } else { meta.inv.unshift(it); G.dropFlag = true; toast(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); log(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); }
   sfx("equip", meta.opts.sfx);
 }
-const prixVente = (it) => Math.max(1, Math.round(4 * it.ilvl * RAR_BY_ID[it.rar].mult));
+/* La vente d'équipement ne rapporte plus d'or : elle produit des morceaux
+   de ferraille ⚒, la monnaie d'affinage. */
+const prixFerraille = (it) => Math.max(1, Math.round(it.ilvl * RAR_BY_ID[it.rar].mult * (1 + 0.5 * ((it.t || 1) - 1) + 0.05 * (it.a || 0))));
 
 function tuerMonstre(G) {
   const run = G.run, meta = G.meta, st = G.st, mon = run.mon;
@@ -1180,6 +1237,16 @@ function tuerMonstre(G) {
     run.tokensPend++; gAdd(G, "domination", 1 * st.gaugeF);
     addFloat(G, "+1 ⬡", "token", "mon");
     log(G, "+1 token de boss ⬡", "#c59bff");
+    if (mon.def.type === "zone") {
+      const zidB = mon.def.zone;
+      if (!Array.isArray(run.essences)) run.essences = [];
+      if (!run.essences.includes(zidB)) {
+        run.essences.push(zidB); meta.essence++;
+        toast(G, "✦ Essence résiduelle absorbée — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#c59bff");
+        log(G, "✦ +1 Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#c59bff");
+        G.saveNow = true;
+      }
+    }
     sfx("boss", meta.opts.sfx);
   }
   rollDrop(G, mon);
@@ -1302,6 +1369,10 @@ function equiper(G, itemId, slotCible) {
   const it = meta.inv[i];
   const cible = slotCible && slotsCibles(it.slot).includes(slotCible) ? slotCible : it.slot;
   if (SLOT_BY_ID[cible].trans || SLOT_BY_ID[it.slot].trans) { toast(G, "Les Armes de Transcendance se forgent en transcendant une zone", "#c59bff"); return; }
+  if (it.rar === "divin") {
+    const nbDivin = Object.keys(meta.equip).filter((k) => k !== cible && meta.equip[k] && meta.equip[k].rar === "divin").length;
+    if (nbDivin >= 1) { toast(G, "Un seul équipement Divin peut être porté pour l'instant", "#ffffff"); return; }
+  }
   meta.inv.splice(i, 1);
   const old = meta.equip[cible];
   meta.equip[cible] = it;
@@ -1311,15 +1382,17 @@ function equiper(G, itemId, slotCible) {
 function vendreItem(G, itemId) {
   const meta = G.meta;
   const i = meta.inv.findIndex((x) => x.id === itemId); if (i < 0) return;
-  const v = prixVente(meta.inv[i]);
-  G.run.gold += v; G.run.stats.or += v;
+  if (meta.inv[i].lock) { toast(G, "Équipement verrouillé — déverrouille-le d'abord", "#ffd45e"); return; }
+  const v = prixFerraille(meta.inv[i]);
+  meta.ferraille += v;
   meta.inv.splice(i, 1);
+  toast(G, "+" + fmt(v) + " ⚒ ferraille", "#b9c2d9");
   sfx("coin", meta.opts.sfx); G.saveNow = true;
 }
 function vendreRarete(G, rarId) {
   const meta = G.meta; let tot = 0, n = 0;
-  meta.inv = meta.inv.filter((it) => { if (it.rar === rarId) { tot += prixVente(it); n++; return false; } return true; });
-  if (tot > 0) { G.run.gold += tot; G.run.stats.or += tot; toast(G, n + " " + RAR_BY_ID[rarId].nom.toLowerCase() + (n > 1 ? "s" : "") + " vendu" + (n > 1 ? "s" : "") + " : +" + fmtM(tot), RAR_BY_ID[rarId].col); sfx("coin", meta.opts.sfx); G.saveNow = true; }
+  meta.inv = meta.inv.filter((it) => { if (it.rar === rarId && !it.lock) { tot += prixFerraille(it); n++; return false; } return true; });
+  if (tot > 0) { meta.ferraille += tot; toast(G, n + " objet" + (n > 1 ? "s" : "") + " " + RAR_BY_ID[rarId].nom.toLowerCase() + (n > 1 ? "s" : "") + " → +" + fmt(tot) + " ⚒", RAR_BY_ID[rarId].col); sfx("coin", meta.opts.sfx); G.saveNow = true; }
 }
 function ameliorerStance(G, id) {
   const meta = G.meta, st = meta.stances[id]; if (!st) return;
@@ -1379,7 +1452,7 @@ function relancer(G) {
 /* ---------- (dé)sérialisation ---------- */
 function versSave(G) {
   const r = G.run;
-  return { v: 2, meta: G.meta, run: r.over ? null : { zoneIdx: r.zoneIdx, niveau: r.niveau, nivZone: r.nivZone, debloque: r.debloque, kills: r.kills, stance: r.stance, lvlAtk: r.lvlAtk, lvlHp: r.lvlHp, gold: r.gold, tokensPend: r.tokensPend, hp: r.hp, stats: r.stats } };
+  return { v: 2, meta: G.meta, run: r.over ? null : { zoneIdx: r.zoneIdx, niveau: r.niveau, nivZone: r.nivZone, debloque: r.debloque, kills: r.kills, stance: r.stance, lvlAtk: r.lvlAtk, lvlHp: r.lvlHp, gold: r.gold, tokensPend: r.tokensPend, hp: r.hp, stats: r.stats, essences: r.essences || [] } };
 }
 function depuisSave(d) {
   const meta = metaInitiale();
@@ -1402,6 +1475,8 @@ function depuisSave(d) {
       Object.assign(meta.recy.fams, d.meta.recy.fams || {});
     }
     meta.armeTChoix = typeof d.meta.armeTChoix === "string" ? d.meta.armeTChoix : null;
+    meta.ferraille = d.meta.ferraille || 0;
+    meta.essence = d.meta.essence || 0;
     /* v0.5.0 : les armes de Transcendance ne sont plus des drops — on purge
        les anciennes de l'inventaire, l'arme équipée est re-dérivée plus bas. */
     meta.inv = meta.inv.filter((it) => it.slot !== "armeT");
@@ -1419,6 +1494,7 @@ function depuisSave(d) {
       run.debloque = run.zoneIdx;
       delete run.tranche;
     }
+    if (!Array.isArray(run.essences)) run.essences = [];
     if (!Array.isArray(run.nivZone) || run.nivZone.length !== ZONES.length) run.nivZone = ZONES.map(() => 1);
     run.nivZone[run.zoneIdx] = run.niveau;
     if (typeof run.debloque !== "number") run.debloque = run.zoneIdx || 0;
@@ -1647,15 +1723,36 @@ function TabStances({ G, maj }) {
   );
 }
 
+function AffinageCtrl({ G, it, maj }) {
+  const meta = G.meta;
+  if (!it || it.nv) return null;
+  const t = it.t || 1, a = it.a || 0;
+  return (
+    <div className="cinfo togline">
+      <span>Affinage <b>Tier {rome(t)}</b> · {a}/10 <span className="dim">(stats ×{multAff(it).toFixed(2).replace(".", ",")})</span></span>
+      {a < 10 ? (
+        <button className="btn mini" disabled={meta.ferraille < coutAffinage(it)} onClick={() => { affiner(G, it.id); maj(); }}>Affiner · ⚒ {fmt(coutAffinage(it))}</button>
+      ) : t < 3 ? (
+        <button className="btn mini evo" disabled={meta.essence < t} onClick={() => { evoluerTier(G, it.id); maj(); }}>Évoluer Tier {rome(t + 1)} · ✦ {t}</button>
+      ) : <span className="dim">Tier maximum atteint</span>}
+      <button className="btn mini ghost" onClick={() => { basculerLock(G, it.id); maj(); }}>{it.lock ? "🔒 Verrouillé" : "🔓 Verrouiller"}</button>
+    </div>
+  );
+}
+
 function TabEquipement({ G, sel, setSel, maj }) {
   const meta = G.meta;
   const [cible, setCible] = useState(null);
+  const [selEq, setSelEq] = useState(null);
   const selIt = sel != null ? meta.inv.find((x) => x.id === sel) : null;
+  const eqIt = selEq && meta.equip[selEq] ? meta.equip[selEq] : null;
   const cibles = selIt ? slotsCibles(selIt.slot) : [];
   const slotCible = selIt ? (cible && cibles.includes(cible) ? cible : selIt.slot) : null;
   const eqSel = selIt ? meta.equip[slotCible] : null;
-  const cles = selIt ? Array.from(new Set([...Object.keys(selIt.stats), ...(eqSel ? Object.keys(eqSel.stats) : [])])) : [];
-  const nbRar = Object.fromEntries(RARS.map((r) => [r.id, meta.inv.filter((it) => it.rar === r.id).length]));
+  const seSel = selIt ? statsEff(selIt) : null;
+  const seEq = eqSel ? statsEff(eqSel) : null;
+  const cles = selIt ? Array.from(new Set([...Object.keys(seSel), ...(seEq ? Object.keys(seEq) : [])])) : [];
+  const nbRar = Object.fromEntries(RARS.map((r) => [r.id, meta.inv.filter((it) => it.rar === r.id && !it.lock).length]));
   const recy = meta.recy;
   return (
     <div>
@@ -1664,18 +1761,27 @@ function TabEquipement({ G, sel, setSel, maj }) {
           const it = meta.equip[s.id];
           const locked = s.trans && maxTrans(meta) < 1;
           return (
-            <div key={s.id} className={"slot" + (locked ? " locked" : "")} style={{ borderColor: it ? RAR_BY_ID[it.rar].col : undefined }}>
+            <div key={s.id} className={"slot" + (locked ? " locked" : "") + (selEq === s.id ? " selrow" : "")} style={{ borderColor: it ? RAR_BY_ID[it.rar].col : undefined, cursor: it ? "pointer" : "default" }}
+              onClick={() => { if (it) { setSelEq(selEq === s.id ? null : s.id); setSel(null); } }}>
               <Spr id={s.ico} scale={3} />
               <div className="slotinfo">
                 <div className="slotnom">{s.nom}</div>
                 {locked ? <div className="slotvide">verrouillé — transcende la Forêt</div>
-                  : it ? <div className="slotit" style={{ color: RAR_BY_ID[it.rar].col }}>{it.nom} · niv {it.ilvl}</div>
+                  : it ? <div className="slotit" style={{ color: RAR_BY_ID[it.rar].col }}>{it.lock ? "🔒 " : ""}{it.nom}{(it.t || 1) > 1 || (it.a || 0) > 0 ? " · T" + rome(it.t || 1) + (it.a ? "+" + it.a : "") : ""} · niv {it.ilvl}</div>
                   : <div className="slotvide">vide</div>}
               </div>
             </div>
           );
         })}
       </div>
+      {eqIt ? (
+        <div className="carte detail" style={{ borderColor: RAR_BY_ID[eqIt.rar].col }}>
+          <div className="ctitre"><Spr id={SLOT_BY_ID[eqIt.slot].ico} scale={2} /> <span style={{ color: RAR_BY_ID[eqIt.rar].col }}>{eqIt.nom}</span> <span className="niv">équipé — {SLOT_BY_ID[selEq].nom} · {RAR_BY_ID[eqIt.rar].nom} · niv {eqIt.ilvl}</span></div>
+          {Object.entries(statsEff(eqIt)).map(([k, v]) => <div key={k} className="cinfo statline"><span>{NOM_ISTAT[k]}</span><b>+{fmt(v)}</b></div>)}
+          <AffinageCtrl G={G} it={eqIt} maj={maj} />
+          <div className="crow"><button className="btn ghost" onClick={() => setSelEq(null)}>Fermer</button></div>
+        </div>
+      ) : null}
       {maxTrans(meta) >= 1 ? (
         <div className="carte" style={{ marginBottom: 10, borderColor: "#6b46a8" }}>
           <div className="ctitre">✦ Armes de Transcendance <span className="niv">uniques · indestructibles · la meilleure s'équipe seule</span></div>
@@ -1738,7 +1844,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
             ))}</div>
           ) : null}
           {cles.map((k) => {
-            const a = selIt.stats[k] || 0, b = eqSel ? (eqSel.stats[k] || 0) : 0, d = a - b;
+            const a = seSel[k] || 0, b = seEq ? (seEq[k] || 0) : 0, d = a - b;
             return (
               <div key={k} className="cinfo statline">
                 <span>{NOM_ISTAT[k]}</span>
@@ -1747,24 +1853,29 @@ function TabEquipement({ G, sel, setSel, maj }) {
             );
           })}
           {eqSel ? <div className="cinfo dim">comparé à : {eqSel.nom} (niv {eqSel.ilvl}) — {SLOT_BY_ID[slotCible].nom}</div> : <div className="cinfo dim">{SLOT_BY_ID[slotCible].nom} : actuellement vide</div>}
+          <AffinageCtrl G={G} it={selIt} maj={maj} />
           <div className="crow">
             <button className="btn" onClick={() => { equiper(G, selIt.id, slotCible); setSel(null); setCible(null); maj(); }}>Équiper → {SLOT_BY_ID[slotCible].nom}</button>
-            <button className="btn ghost" onClick={() => { vendreItem(G, selIt.id); setSel(null); maj(); }}>Vendre +{fmtM(prixVente(selIt))}</button>
+            <button className="btn ghost" disabled={!!selIt.lock} onClick={() => { vendreItem(G, selIt.id); setSel(null); maj(); }}>{selIt.lock ? "🔒 Verrouillé" : "Recycler +" + fmt(prixFerraille(selIt)) + " ⚒"}</button>
             <button className="btn ghost" onClick={() => { setSel(null); setCible(null); }}>Fermer</button>
           </div>
         </div>
       ) : null}
       <div className="invlist">
         {meta.inv.length === 0 ? <p className="note">Rien pour l'instant. Les monstres lâchent leur butin en mourant — 5% sur un monstre, 45% sur un boss de niveau, garanti sur le boss de zone.</p> : null}
-        {meta.inv.map((it) => (
-          <div key={it.id} className={"invrow" + (sel === it.id ? " selrow" : "")} onClick={() => { setSel(it.id); setCible(null); }}>
-            <Spr id={SLOT_BY_ID[it.slot].ico} scale={2} />
-            <span className="invnom" style={{ color: RAR_BY_ID[it.rar].col }}>{it.nom}</span>
-            <span className="slottag dim">{SLOT_BY_ID[it.slot].nom}</span>
-            <span className="dim">niv {it.ilvl}</span>
-            <span className="invstats dim">{Object.keys(it.stats).map((k) => "+" + fmt(it.stats[k]) + " " + NOM_ISTAT[k]).join(" · ")}</span>
-          </div>
-        ))}
+        {meta.inv.map((it) => {
+          const se = statsEff(it);
+          return (
+            <div key={it.id} className={"invrow" + (sel === it.id ? " selrow" : "")} onClick={() => { setSel(it.id); setCible(null); setSelEq(null); }}>
+              <Spr id={SLOT_BY_ID[it.slot].ico} scale={2} />
+              <span className="invnom" style={{ color: RAR_BY_ID[it.rar].col }}>{it.lock ? "🔒 " : ""}{it.nom}</span>
+              <span className="slottag dim">{SLOT_BY_ID[it.slot].nom}</span>
+              {(it.t || 1) > 1 || (it.a || 0) > 0 ? <span className="slottag" style={{ color: RAR_BY_ID[it.rar].col, borderColor: RAR_BY_ID[it.rar].col }}>T{rome(it.t || 1)} · {it.a || 0}/10</span> : null}
+              <span className="dim">niv {it.ilvl}</span>
+              <span className="invstats dim">{Object.keys(se).map((k) => "+" + fmt(se[k]) + " " + NOM_ISTAT[k]).join(" · ")}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -2136,6 +2247,8 @@ const CSS = `
 .cmdcol .btn{ width:100%; text-align:center; padding:10px; }
 .topbar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
 .tbcentre{ display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; }
+.tbgauche{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.tbgauche .tbside{ font-size:18px; }
 .tbside{ font-size:22px; font-weight:700; display:flex; align-items:center; gap:7px; }
 .tbside .pend{ font-size:18px; margin-left:0; }
 .tbdim{ font-size:16px; color:var(--dim); font-weight:500; }
@@ -2225,7 +2338,11 @@ export default function Transcendance() {
       <style>{CSS}</style>
       <div className="entete"><span className="titre">TRANSCENDANCE</span><span className="stitre">idle roguelite — v{VERSION}</span></div>
       <div className="topbar">
-        <span className="tbside tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
+        <span className="tbgauche">
+          <span className="tbside tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
+          <span className="tbside" style={{ color: "#b9c2d9" }}>⚒ {fmt(G.meta.ferraille)} <span className="tbdim">ferraille</span></span>
+          <span className="tbside" style={{ color: "#c59bff" }}>✦ {G.meta.essence} <span className="tbdim">essence{G.meta.essence > 1 ? "s" : ""}</span></span>
+        </span>
         <span className="tbcentre">
           <span className="zlabel">
             <button className="zarrow" disabled={run.zoneIdx <= 0 || run.over} onClick={() => { changerZone(G, -1); maj(); }} title="Zone précédente">◀</button>
