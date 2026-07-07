@@ -11,8 +11,14 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.5";
+const VERSION = "0.5.6";
 const CHANGELOG = [
+  { v: "0.5.6", date: "7 juillet 2026", titre: "Contours, cadrage & meilleur équipement", points: [
+    "Tous les textes ont maintenant un contour noir de 1px, façon jeu vidéo — lisibles sur n'importe quel fond.",
+    "La scène de combat est recadrée : héros et monstres tiennent entièrement dans le cadre.",
+    "Interface resserrée : tout tient à l'écran sans défilement.",
+    "Nouveau bouton « ⚡ Équiper le meilleur » (onglet Équipement) : calcule la valeur de chaque objet et équipe automatiquement la meilleure combinaison, slots jumeaux compris.",
+  ] },
   { v: "0.5.5", date: "7 juillet 2026", titre: "Une police qui se lit, enfin", points: [
     "Les textes et les chiffres passent sur une police nette et moderne (Jost) — la précédente était élégante mais illisible sur fond sombre. Les titres gardent leur style FF13.",
     "Les chiffres sur les barres ont maintenant un contour sombre : lisibles quel que soit le remplissage.",
@@ -941,6 +947,39 @@ function recyclable(meta, it) {
   const r = meta.recy;
   return !!(r && r.on && r.rars[it.rar] && r.fams[fam(it.slot)] && (!r.nivMax || it.ilvl <= r.nivMax));
 }
+/* ---------- équiper le meilleur ----------
+   Score pondéré par stat (valeur relative approximative d'un point de chaque
+   stat) ; pour les slots jumeaux, les 2 meilleurs candidats sont répartis. */
+const POIDS_STAT = { atkF: 1, atkP: 2.2, hpF: 0.35, hpP: 1.6, defF: 1.2, asP: 2.0, critC: 2.2, critD: 1.1, goldP: 1.5, vsBossP: 0.8, gaugeP: 1.2 };
+function scoreItem(it) { let s = 0; for (const k in it.stats) s += (POIDS_STAT[k] || 1) * it.stats[k]; return s; }
+function equiperMeilleur(G) {
+  const meta = G.meta; let changes = 0;
+  const traites = new Set();
+  SLOTS.filter((s) => !s.trans).forEach((s) => {
+    const cibles = slotsCibles(s.id), key = cibles.join("+");
+    if (traites.has(key)) return; traites.add(key);
+    const cands = [];
+    cibles.forEach((cid) => { if (meta.equip[cid]) cands.push(meta.equip[cid]); });
+    meta.inv.forEach((it) => { if (slotsCibles(it.slot).join("+") === key) cands.push(it); });
+    if (!cands.length) return;
+    cands.sort((a, b) => scoreItem(b) - scoreItem(a));
+    const top = cands.slice(0, cibles.length);
+    const topIds = new Set(top.map((t) => t.id));
+    cibles.forEach((cid) => {
+      const cur = meta.equip[cid];
+      if (cur && !topIds.has(cur.id)) { meta.inv.unshift(cur); meta.equip[cid] = null; }
+    });
+    meta.inv = meta.inv.filter((it) => !topIds.has(it.id));
+    const dejaEquipes = new Set(cibles.map((cid) => meta.equip[cid] && meta.equip[cid].id).filter(Boolean));
+    const restants = top.filter((t) => !dejaEquipes.has(t.id));
+    cibles.forEach((cid) => {
+      if (!meta.equip[cid] && restants.length) { meta.equip[cid] = restants.shift(); changes++; }
+    });
+  });
+  if (changes > 0) { toast(G, "Meilleur équipement : " + changes + " changement" + (changes > 1 ? "s" : ""), "#8be05f"); sfx("equip", meta.opts.sfx); }
+  else toast(G, "Tu portes déjà le meilleur équipement disponible", "#ccd6f4");
+  G.saveNow = true;
+}
 
 /* ---------- sauvegarde ---------- */
 const SAVE_KEY = "transcendance-v1";
@@ -1467,7 +1506,7 @@ function Scene({ G }) {
       <div className="vsband"><span className="g">Héros</span><span className="vsm">VS</span><span className="g">{mon ? (vu ? mon.def.nom : "? ? ?") : "…"}</span></div>
       <div className="combattant hero">
         <div className="floats">{G.floats.filter((f) => f.side === "hero").map((f) => <span key={f.id} className={"float " + f.cls} style={{ left: f.x + "%" }}>{f.txt}</span>)}</div>
-        <div className={"sprwrap bob" + (heroLunge ? " lunge" : "") + (heroHurt ? " flash" : "")}><Spr id="hero" scale={6} flip /></div>
+        <div className={"sprwrap bob" + (heroLunge ? " lunge" : "") + (heroHurt ? " flash" : "")}><Spr id="hero" scale={5} flip /></div>
         <div className="plate">
           <div className="pname">Héros <span className="psub">{STANCE_BY_ID[run.stance].ico} {STANCE_BY_ID[run.stance].nom}</span></div>
           <Bar v={run.hp} max={st.hpMax} col="#ff4252" h={16} txt={fmt(Math.max(0, run.hp)) + " / " + fmt(st.hpMax)} />
@@ -1479,7 +1518,7 @@ function Scene({ G }) {
         {mon ? (
           <>
             <div className={"sprwrap bob2" + (now - G.heroAtk < 160 ? " flash" : "")}>
-              <Spr id={mon.def.spr} scale={bossT ? 8 : 6} silhouette={!vu} />
+              <Spr id={mon.def.spr} scale={bossT ? 7 : 5} silhouette={!vu} />
             </div>
             <div className="plate">
               <div className="pname" style={{ color: bossT ? monCol : "#fff" }}>
@@ -1665,6 +1704,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
       </div>
       <div className="invhead">
         <span>Inventaire <b>{meta.inv.length}</b>/60 <span className="dim">(persiste entre les runs)</span></span>
+        <button className="btn" onClick={() => { equiperMeilleur(G); setSel(null); setCible(null); maj(); }}>⚡ Équiper le meilleur</button>
         <span className="vendrow">Vendre : {RARS.map((r) => (
           <button key={r.id} className="btn mini ghost" style={{ borderColor: r.col, color: r.col }} disabled={!nbRar[r.id]}
             onClick={() => { vendreRarete(G, r.id); setSel(null); maj(); }}>{r.nom}s ({nbRar[r.id]})</button>
@@ -1895,7 +1935,8 @@ const CSS = `
 .trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#ffffff; --dim:#ccd6f4; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
   background: radial-gradient(1200px 500px at 50% -10%, #2a3358 0%, #161b2e 60%), #161b2e;
   color:var(--txt); font-family:'Jost', 'Segoe UI', sans-serif; font-size:16px; font-weight:500; line-height:1.4;
-  min-height:100vh; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box; overflow-x:clip; }
+  min-height:100vh; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box; overflow-x:clip;
+  text-shadow:-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000; }
 .trx *{ box-sizing:border-box; }
 .trx b{ font-weight:700; }
 .trx button{ font-family:'Cinzel', Georgia, serif; }
@@ -1914,7 +1955,7 @@ const CSS = `
 .pip.cur{ animation:pulse 1.1s infinite; border-color:var(--cyan); }
 .gear{ background:none; border:none; color:var(--dim); font-size:17px; cursor:pointer; padding:2px 4px; }
 .gear:hover{ color:var(--txt); }
-.scene{ position:relative; height:200px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
+.scene{ position:relative; height:240px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
   background:linear-gradient(#2e3a68 0%, #232b52 42%, #1a2138 100%);
   display:flex; align-items:flex-end; justify-content:space-between; padding:0 4%; }
 .treeline{ position:absolute; left:-2%; right:-2%; bottom:30px; height:88px; background:#1e3326; opacity:.9;
@@ -1924,7 +1965,7 @@ const CSS = `
 .sol{ position:absolute; left:0; right:0; bottom:0; height:32px; background:linear-gradient(#2c4a2e, #1b2c1e); border-top:4px solid #3a6038; }
 .lucioles{ position:absolute; inset:0; pointer-events:none; }
 .luciole{ position:absolute; top:30%; width:4px; height:4px; background:#ffe9a0; box-shadow:0 0 7px 2px rgba(255,212,94,.55); animation:luciole 8s ease-in-out infinite; }
-.combattant{ position:relative; width:42%; display:flex; flex-direction:column; align-items:center; gap:7px; padding-bottom:40px; z-index:2; }
+.combattant{ position:relative; width:min(380px,42%); display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:7px; padding-bottom:40px; z-index:2; height:100%; }
 .sprwrap{ filter:drop-shadow(0 6px 0 rgba(0,0,0,.35)); transition:margin .1s; }
 .bob{ animation:bob 2.1s ease-in-out infinite; }
 .bob2{ animation:bob 2.6s ease-in-out infinite; }
@@ -2024,8 +2065,8 @@ const CSS = `
 .titre{ font-size:24px; } .mtitre{ font-size:20px; } .tabbtn{ font-size:15px; letter-spacing:1px; } .pname{ font-size:12px; } .btn.big{ font-size:15px; }
 .cinfo{ font-size:15.5px; } .note{ font-size:15px; } .btn{ font-size:13.5px; } .schip{ font-size:16px; }
 .invnom{ font-size:16px; } .invstats{ font-size:14px; } .slotit{ font-size:14.5px; } .slotvide{ font-size:13.5px; } .slotnom{ font-size:11.5px; }
-.jhead{ font-size:19px; margin-bottom:4px; } .jsrc{ font-size:15.5px; } .jpal{ font-size:17px; font-weight:700; } .jeff{ font-size:16px; margin-top:4px; font-weight:600; } .niv{ font-size:13px; }
-.jnom{ font-weight:700; } .jauge{ margin-bottom:16px; }
+.jhead{ font-size:18px; margin-bottom:1px; } .jsrc{ font-size:15px; } .jpal{ font-size:16px; font-weight:700; } .jeff{ font-size:15px; margin-top:1px; font-weight:600; } .niv{ font-size:13px; }
+.jnom{ font-weight:700; } .jauge{ margin-bottom:8px; }
 .jeff,.jsrc{ color:#e8edff; }
 .bartxt{ font-size:15px; font-weight:700; letter-spacing:.6px; color:#fff; text-shadow:0 1px 2px #000, 0 0 5px #000, 1px 1px 0 #000; }
 .pend{ font-size:13px; }
@@ -2037,8 +2078,9 @@ const CSS = `
 .invstats,.slotvide{ color:#dbe2fa; }
 .jauge{ margin-bottom:8px; }
 .panneau{ padding:10px 12px; }
-.toast{ padding:5px 9px; font-size:14px; }
-.titre{ font-size:20px; letter-spacing:5px; } .stitre{ font-size:9px; }
+.toast{ padding:4px 9px; font-size:14px; }
+.titre{ font-size:17px; letter-spacing:5px; } .stitre{ font-size:8px; }
+.carte{ padding:8px; gap:3px; }
 .colonnes{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(380px,0.9fr); gap:8px; align-items:stretch; }
 .colG{ display:flex; flex-direction:column; gap:8px; min-width:0; }
 .colG .panneau{ flex:1; }
@@ -2049,7 +2091,7 @@ const CSS = `
 .pcmd .cmdcol{ display:flex; flex-direction:column; gap:8px; }
 .pjournal{ grid-column:1 / -1; display:flex; flex-direction:column; min-height:170px; overflow:hidden; }
 .pnotifs{ width:100%; }
-.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:86px; overflow-y:auto; }
+.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:66px; overflow-y:auto; }
 .ctitel{ font-size:14px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:9px; }
 .statcol{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .statcol .schip{ display:flex; justify-content:space-between; align-items:baseline; }
