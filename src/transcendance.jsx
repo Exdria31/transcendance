@@ -11,8 +11,12 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.8.1";
+const VERSION = "0.8.2";
 const CHANGELOG = [
+  { v: "0.8.2", date: "7 juillet 2026", titre: "Boutons du vestiaire lisibles", points: [
+    "Les quatre boutons de l'onglet Équipement affichent leur nom complet : Ensemble Équipement, Priorités Équipement, Recyclage Automatique, Arme Transcendance.",
+    "Le personnage et ses compartiments remontent juste sous le titre, et l'inventaire cède la largeur nécessaire aux boutons.",
+  ] },
   { v: "0.8.1", date: "7 juillet 2026", titre: "Le vestiaire prend ses aises", points: [
     "L'onglet Équipement est réagencé en trois panneaux : détails de la pièce sélectionnée à gauche, personnage au centre, inventaire à droite — plus d'espace perdu.",
     "Quatre boutons à droite ouvrent leurs fenêtres dédiées : Ensembles (E E), Priorités (PE), Recyclage auto (RA) et Armes de Transcendance (AT).",
@@ -1967,10 +1971,10 @@ function TabEquipement({ G, sel, setSel, maj }) {
         </div>
       </div>
       <div className="eqbtns">
-        <button className="eqbtn" title="Ensembles d'équipement" onClick={() => setFenetre("ens")}>🧰<small>E E</small></button>
-        <button className="eqbtn" title="Priorités d'« Équiper le meilleur »" onClick={() => setFenetre("prio")}>🎯<small>PE</small></button>
-        <button className="eqbtn" title="Recyclage automatique" onClick={() => setFenetre("recy")}>♻<small>RA</small></button>
-        <button className="eqbtn" title="Armes de Transcendance" onClick={() => setFenetre("at")}>✦<small>AT</small></button>
+        <button className="eqbtn" onClick={() => setFenetre("ens")}>🧰<small>Ensemble Équipement</small></button>
+        <button className="eqbtn" onClick={() => setFenetre("prio")}>🎯<small>Priorités Équipement</small></button>
+        <button className="eqbtn" onClick={() => setFenetre("recy")}>♻<small>Recyclage Automatique</small></button>
+        <button className="eqbtn" onClick={() => setFenetre("at")}>✦<small>Arme Transcendance</small></button>
       </div>
     </div>
     {fenetre ? (
@@ -2484,19 +2488,19 @@ const CSS = `
 .colonnes.modeEquip{ grid-template-columns:minmax(0,1fr) 340px; }
 .colonnes.modeEquip .zoneDroite{ grid-template-columns:1fr; }
 .colonnes.modeEquip .colG .panneau{ display:flex; flex-direction:column; overflow:hidden; }
-.equipzone{ display:grid; grid-template-columns:minmax(250px,0.95fr) auto minmax(300px,1.25fr) 68px; gap:10px; flex:1; min-height:0; align-items:stretch; }
+.equipzone{ display:grid; grid-template-columns:minmax(240px,1fr) auto minmax(260px,1.1fr) 152px; gap:10px; flex:1; min-height:0; align-items:stretch; }
 .eqpanel{ border:2px solid var(--line); border-radius:12px; background:rgba(0,0,0,.16); padding:8px 10px; display:flex; flex-direction:column; min-height:0; min-width:0; }
 .eqinfo{ overflow-y:auto; }
 .eqdetail{ border-left:3px solid var(--line); padding-left:8px; display:flex; flex-direction:column; gap:4px; }
 .eqdoll{ align-items:center; }
-.eqdoll .doll{ margin-bottom:0; flex:1; align-items:center; }
+.eqdoll .doll{ margin-bottom:0; flex:0 0 auto; margin-top:4px; }
 .eqinv .invgrid{ overflow-y:auto; flex:1; min-height:0; align-content:start; }
 .eqinv .invhead{ margin:4px 0; }
-.eqbtns{ display:flex; flex-direction:column; gap:8px; }
-.eqbtn{ width:64px; height:64px; border:2px solid var(--line); border-radius:12px; background:var(--panel2); cursor:pointer; color:var(--txt); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:19px; box-shadow:0 3px 0 #0c0f1e; }
+.eqbtns{ display:flex; flex-direction:column; gap:10px; width:152px; }
+.eqbtn{ width:100%; padding:12px 8px; border:2px solid var(--line); border-radius:12px; background:var(--panel2); cursor:pointer; color:var(--txt); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; font-size:22px; box-shadow:0 3px 0 #0c0f1e; }
 .eqbtn:hover{ border-color:var(--gold); }
 .eqbtn:active{ transform:translateY(2px); box-shadow:none; }
-.eqbtn small{ font-size:9.5px; font-family:'Cinzel', Georgia, serif; letter-spacing:.5px; color:var(--dim); }
+.eqbtn small{ font-size:11.5px; font-family:'Cinzel', Georgia, serif; letter-spacing:.5px; color:var(--txt); white-space:normal; line-height:1.3; text-align:center; }
 .modale.large{ width:min(880px,94vw); }
 .ctitel2{ font-family:'Cinzel', Georgia, serif; font-size:11.5px; letter-spacing:1.5px; text-transform:uppercase; margin:2px 0 4px; }
 .eqdoll .dollmid{ flex:0 1 210px; padding:10px 14px; }
