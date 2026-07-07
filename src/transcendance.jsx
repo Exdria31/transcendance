@@ -11,8 +11,12 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.8";
+const VERSION = "0.5.9";
 const CHANGELOG = [
+  { v: "0.5.9", date: "7 juillet 2026", titre: "Notifications élargies", points: [
+    "La fenêtre Notifications affiche maintenant 5 lignes.",
+    "Le reste de l'interface s'est légèrement resserré pour compenser — toujours zéro défilement, ni sur la page ni sur les jauges.",
+  ] },
   { v: "0.5.8", date: "7 juillet 2026", titre: "Notifications à leur taille", points: [
     "La fenêtre Notifications colle enfin à son contenu : la liste remplit toute la boîte, sans grand vide en dessous.",
     "L'espace récupéré remonte aux jauges méta : les 7 jauges tiennent sans défilement.",
@@ -1594,7 +1598,7 @@ function TabJauges({ G }) {
               {pend > 0 ? <span className="pend">+{pend} palier{pend > 1 ? "s" : ""} en attente</span> : null}
               <span className="jpal" style={{ color: g.col }}>palier {gs.applied}{pend > 0 ? " → " + t : ""}</span>
             </div>
-            <Bar v={gs.total - deja} max={prochain - deja} col={g.col} h={20} glow={pend > 0} txt={F(gs.total - deja) + " / " + F(prochain - deja)} />
+            <Bar v={gs.total - deja} max={prochain - deja} col={g.col} h={18} glow={pend > 0} txt={F(gs.total - deja) + " / " + F(prochain - deja)} />
             <div className="jeff">{g.eff} — actif : <b style={{ color: g.col }}>{g.rabais ? "−" + (100 * (1 - Math.pow(0.99, gs.applied))).toFixed(1).replace(".", ",") + "%" : "+" + (gs.applied * g.par).toString().replace(".", ",") + "%"}</b>{g.id === "fortune" ? <span className="dim"> · or de la run en attente : +{fmtM(G.run.gold)}</span> : null}</div>
           </div>
         );
@@ -1964,7 +1968,7 @@ const CSS = `
 .pip.cur{ animation:pulse 1.1s infinite; border-color:var(--cyan); }
 .gear{ background:none; border:none; color:var(--dim); font-size:17px; cursor:pointer; padding:2px 4px; }
 .gear:hover{ color:var(--txt); }
-.scene{ position:relative; height:240px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
+.scene{ position:relative; height:218px; border:3px solid var(--line); border-radius:12px; overflow:hidden;
   background:linear-gradient(#2e3a68 0%, #232b52 42%, #1a2138 100%);
   display:flex; align-items:flex-end; justify-content:space-between; padding:0 4%; }
 .treeline{ position:absolute; left:-2%; right:-2%; bottom:30px; height:88px; background:#1e3326; opacity:.9;
@@ -2075,18 +2079,21 @@ const CSS = `
 .cinfo{ font-size:15.5px; } .note{ font-size:15px; } .btn{ font-size:13.5px; } .schip{ font-size:16px; }
 .invnom{ font-size:16px; } .invstats{ font-size:14px; } .slotit{ font-size:14.5px; } .slotvide{ font-size:13.5px; } .slotnom{ font-size:11.5px; }
 .jhead{ font-size:18px; margin-bottom:1px; } .jsrc{ font-size:15px; } .jpal{ font-size:16px; font-weight:700; } .jeff{ font-size:15px; margin-top:1px; font-weight:600; } .niv{ font-size:13px; }
-.jnom{ font-weight:700; } .jauge{ margin-bottom:7px; }
+.jnom{ font-weight:700; } .jauge{ margin-bottom:5px; }
+.bartxt{ font-size:13.5px; }
 .jeff,.jsrc{ color:#e8edff; }
 .bartxt{ font-size:15px; font-weight:700; letter-spacing:.6px; color:#fff; text-shadow:0 1px 2px #000, 0 0 5px #000, 1px 1px 0 #000; }
 .pend{ font-size:13px; }
 .toast{ font-size:15px; } .bartxt{ font-size:11px; } .mgain{ font-size:15px; } .mstats{ font-size:15px; } .cinfo.sub{ font-size:14.5px; }
 .zlabel{ font-size:16px; } .chip{ font-size:13.5px; font-family:'Jost', 'Segoe UI', sans-serif; font-weight:600; }
 .ta{ font-family:ui-monospace, 'Courier New', monospace; }
-.note{ background:rgba(0,0,0,.34); color:#f0f3ff; margin:0 0 8px; }
+.note{ background:rgba(0,0,0,.34); color:#f0f3ff; margin:0 0 6px; padding:5px 9px; }
 .schip{ color:#f0f3ff; }
 .invstats,.slotvide{ color:#dbe2fa; }
 .jauge{ margin-bottom:8px; }
-.panneau{ padding:10px 12px; }
+.panneau{ padding:8px 12px; }
+.tabbtn{ padding:7px 4px; }
+.topbar{ padding:6px 12px; }
 .toast{ padding:4px 9px; font-size:14px; }
 .entete{ display:flex; align-items:baseline; justify-content:center; gap:12px; flex:0 0 auto; }
 .titre{ font-size:16px; letter-spacing:5px; margin:0; }
@@ -2106,7 +2113,7 @@ const CSS = `
 .zoneDroite .chips{ flex-wrap:wrap; overflow:visible; }
 .pcmd .cmdcol{ display:flex; flex-direction:column; gap:8px; }
 .pjournal{ grid-column:1 / -1; display:flex; flex-direction:column; min-height:120px; overflow:hidden; }
-.pnotifs{ width:100%; flex:0 0 122px; min-height:0; display:flex; flex-direction:column; }
+.pnotifs{ width:100%; flex:0 0 188px; min-height:0; display:flex; flex-direction:column; }
 .notiflist{ display:flex; flex-direction:column; gap:4px; flex:1; min-height:0; overflow-y:auto; }
 .zoneDroite{ min-height:0; }
 .pstats{ min-height:0; }
