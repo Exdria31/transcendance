@@ -11,8 +11,12 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.8.2";
+const VERSION = "0.8.3";
 const CHANGELOG = [
+  { v: "0.8.3", date: "7 juillet 2026", titre: "Cadres ajustés & stance affichée", points: [
+    "Les cadres de l'onglet Équipement épousent leur contenu — fini les grandes zones vides en bas.",
+    "La stance active et son niveau s'affichent sous le personnage, dans un cadre central élargi.",
+  ] },
   { v: "0.8.2", date: "7 juillet 2026", titre: "Boutons du vestiaire lisibles", points: [
     "Les quatre boutons de l'onglet Équipement affichent leur nom complet : Ensemble Équipement, Priorités Équipement, Recyclage Automatique, Arme Transcendance.",
     "Le personnage et ses compartiments remontent juste sous le titre, et l'inventaire cède la largeur nécessaire aux boutons.",
@@ -1929,6 +1933,8 @@ function TabEquipement({ G, sel, setSel, maj }) {
           <div className="dollcol">{DOLL_G.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
           <div className="dollmid">
             <Spr id="hero" scale={6} flip />
+            <div className="dstance" style={{ color: STANCE_BY_ID[G.run.stance].col }}>{STANCE_BY_ID[G.run.stance].ico} {STANCE_BY_ID[G.run.stance].nom}</div>
+            <div className="cinfo dim">{meta.stances[G.run.stance] ? "niv " + meta.stances[G.run.stance].niv + " · évo " + meta.stances[G.run.stance].evo : "stance fixe"}</div>
           </div>
           <div className="dollcol">{DOLL_D.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
         </div>
@@ -2488,13 +2494,13 @@ const CSS = `
 .colonnes.modeEquip{ grid-template-columns:minmax(0,1fr) 340px; }
 .colonnes.modeEquip .zoneDroite{ grid-template-columns:1fr; }
 .colonnes.modeEquip .colG .panneau{ display:flex; flex-direction:column; overflow:hidden; }
-.equipzone{ display:grid; grid-template-columns:minmax(240px,1fr) auto minmax(260px,1.1fr) 152px; gap:10px; flex:1; min-height:0; align-items:stretch; }
+.equipzone{ display:grid; grid-template-columns:minmax(240px,1fr) auto minmax(240px,1fr) 152px; gap:10px; flex:0 0 auto; min-height:0; align-items:start; }
 .eqpanel{ border:2px solid var(--line); border-radius:12px; background:rgba(0,0,0,.16); padding:8px 10px; display:flex; flex-direction:column; min-height:0; min-width:0; }
-.eqinfo{ overflow-y:auto; }
+.eqinfo{ overflow-y:auto; max-height:60vh; }
 .eqdetail{ border-left:3px solid var(--line); padding-left:8px; display:flex; flex-direction:column; gap:4px; }
 .eqdoll{ align-items:center; }
 .eqdoll .doll{ margin-bottom:0; flex:0 0 auto; margin-top:4px; }
-.eqinv .invgrid{ overflow-y:auto; flex:1; min-height:0; align-content:start; }
+.eqinv .invgrid{ overflow-y:auto; max-height:46vh; min-height:0; align-content:start; }
 .eqinv .invhead{ margin:4px 0; }
 .eqbtns{ display:flex; flex-direction:column; gap:10px; width:152px; }
 .eqbtn{ width:100%; padding:12px 8px; border:2px solid var(--line); border-radius:12px; background:var(--panel2); cursor:pointer; color:var(--txt); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; font-size:22px; box-shadow:0 3px 0 #0c0f1e; }
@@ -2503,7 +2509,8 @@ const CSS = `
 .eqbtn small{ font-size:11.5px; font-family:'Cinzel', Georgia, serif; letter-spacing:.5px; color:var(--txt); white-space:normal; line-height:1.3; text-align:center; }
 .modale.large{ width:min(880px,94vw); }
 .ctitel2{ font-family:'Cinzel', Georgia, serif; font-size:11.5px; letter-spacing:1.5px; text-transform:uppercase; margin:2px 0 4px; }
-.eqdoll .dollmid{ flex:0 1 210px; padding:10px 14px; }
+.eqdoll .dollmid{ flex:0 1 270px; min-width:220px; padding:16px 18px; }
+.dstance{ font-family:'Cinzel', Georgia, serif; font-size:15px; font-weight:700; margin-top:8px; text-align:center; }
 .pstats .statcol{ margin-bottom:8px; gap:5px; }
 .doll{ display:flex; gap:14px; justify-content:center; align-items:stretch; margin-bottom:10px; }
 .dollcol{ display:flex; flex-direction:column; gap:6px; }
