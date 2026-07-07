@@ -11,8 +11,13 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.7.0";
+const VERSION = "0.7.1";
 const CHANGELOG = [
+  { v: "0.7.1", date: "7 juillet 2026", titre: "Finitions de forge", points: [
+    "L'essence résiduelle brille désormais en rouge rubis, et son nom complet s'affiche dans le bandeau.",
+    "Les ressources du bandeau sont encadrées d'un liseré doré — chaque monnaie a son écrin.",
+    "Clic droit sur un objet (inventaire ou équipé) pour le 🔒 verrouiller/déverrouiller instantanément.",
+  ] },
   { v: "0.7.0", date: "7 juillet 2026", titre: "La forge : affinage, tiers et nouvelles raretés", points: [
     "La vente d'équipement ne rapporte plus d'or mais des ⚒ morceaux de ferraille, la nouvelle monnaie de forge.",
     "Affinage : chaque objet peut être affiné 10 fois à la ferraille (+5% de stats par niveau), puis évoluer en Tier II et III — jusqu'à ×2,5 les stats de base.",
@@ -1242,8 +1247,8 @@ function tuerMonstre(G) {
       if (!Array.isArray(run.essences)) run.essences = [];
       if (!run.essences.includes(zidB)) {
         run.essences.push(zidB); meta.essence++;
-        toast(G, "✦ Essence résiduelle absorbée — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#c59bff");
-        log(G, "✦ +1 Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#c59bff");
+        toast(G, "✦ Essence résiduelle absorbée — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#ff3b5c");
+        log(G, "✦ +1 Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#ff3b5c");
         G.saveNow = true;
       }
     }
@@ -1762,7 +1767,8 @@ function TabEquipement({ G, sel, setSel, maj }) {
           const locked = s.trans && maxTrans(meta) < 1;
           return (
             <div key={s.id} className={"slot" + (locked ? " locked" : "") + (selEq === s.id ? " selrow" : "")} style={{ borderColor: it ? RAR_BY_ID[it.rar].col : undefined, cursor: it ? "pointer" : "default" }}
-              onClick={() => { if (it) { setSelEq(selEq === s.id ? null : s.id); setSel(null); } }}>
+              onClick={() => { if (it) { setSelEq(selEq === s.id ? null : s.id); setSel(null); } }}
+              onContextMenu={(e) => { e.preventDefault(); if (it) { basculerLock(G, it.id); maj(); } }}>
               <Spr id={s.ico} scale={3} />
               <div className="slotinfo">
                 <div className="slotnom">{s.nom}</div>
@@ -1862,11 +1868,12 @@ function TabEquipement({ G, sel, setSel, maj }) {
         </div>
       ) : null}
       <div className="invlist">
-        {meta.inv.length === 0 ? <p className="note">Rien pour l'instant. Les monstres lâchent leur butin en mourant — 5% sur un monstre, 45% sur un boss de niveau, garanti sur le boss de zone.</p> : null}
+        {meta.inv.length === 0 ? <p className="note">Rien pour l'instant. Les monstres lâchent leur butin en mourant — 5% sur un monstre, 45% sur un boss de niveau, garanti sur le boss de zone. Astuce : clic droit sur un objet pour le 🔒 verrouiller.</p> : null}
         {meta.inv.map((it) => {
           const se = statsEff(it);
           return (
-            <div key={it.id} className={"invrow" + (sel === it.id ? " selrow" : "")} onClick={() => { setSel(it.id); setCible(null); setSelEq(null); }}>
+            <div key={it.id} className={"invrow" + (sel === it.id ? " selrow" : "")} onClick={() => { setSel(it.id); setCible(null); setSelEq(null); }}
+              onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
               <Spr id={SLOT_BY_ID[it.slot].ico} scale={2} />
               <span className="invnom" style={{ color: RAR_BY_ID[it.rar].col }}>{it.lock ? "🔒 " : ""}{it.nom}</span>
               <span className="slottag dim">{SLOT_BY_ID[it.slot].nom}</span>
@@ -2247,8 +2254,10 @@ const CSS = `
 .cmdcol .btn{ width:100%; text-align:center; padding:10px; }
 .topbar{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
 .tbcentre{ display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; }
-.tbgauche{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.tbgauche{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .tbgauche .tbside{ font-size:18px; }
+.reschip{ border:2px solid #c9a227; border-radius:9px; padding:2px 11px; background:rgba(0,0,0,.28); box-shadow:inset 0 0 8px rgba(201,162,39,.12); }
+.tbdroite{ display:flex; justify-content:flex-end; }
 .tbside{ font-size:22px; font-weight:700; display:flex; align-items:center; gap:7px; }
 .tbside .pend{ font-size:18px; margin-left:0; }
 .tbdim{ font-size:16px; color:var(--dim); font-weight:500; }
@@ -2339,9 +2348,9 @@ export default function Transcendance() {
       <div className="entete"><span className="titre">TRANSCENDANCE</span><span className="stitre">idle roguelite — v{VERSION}</span></div>
       <div className="topbar">
         <span className="tbgauche">
-          <span className="tbside tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
-          <span className="tbside" style={{ color: "#b9c2d9" }}>⚒ {fmt(G.meta.ferraille)} <span className="tbdim">ferraille</span></span>
-          <span className="tbside" style={{ color: "#c59bff" }}>✦ {G.meta.essence} <span className="tbdim">essence{G.meta.essence > 1 ? "s" : ""}</span></span>
+          <span className="tbside reschip tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
+          <span className="tbside reschip" style={{ color: "#b9c2d9" }}>⚒ {fmt(G.meta.ferraille)} <span className="tbdim">ferraille</span></span>
+          <span className="tbside reschip" style={{ color: "#ff3b5c" }}>✦ {G.meta.essence} <span className="tbdim">essence{G.meta.essence > 1 ? "s" : ""} résiduelle{G.meta.essence > 1 ? "s" : ""}</span></span>
         </span>
         <span className="tbcentre">
           <span className="zlabel">
@@ -2351,7 +2360,7 @@ export default function Transcendance() {
           </span>
           <Pips kills={run.kills} />
         </span>
-        <span className="tbside tbdroite gold">◆ {fmtM(run.gold)}</span>
+        <span className="tbdroite"><span className="tbside reschip gold">◆ {fmtM(run.gold)}</span></span>
       </div>
       <Scene G={G} />
       <div className="tabsbar">
