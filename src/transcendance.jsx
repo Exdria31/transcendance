@@ -11,8 +11,12 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.7";
+const VERSION = "0.5.8";
 const CHANGELOG = [
+  { v: "0.5.8", date: "7 juillet 2026", titre: "Notifications à leur taille", points: [
+    "La fenêtre Notifications colle enfin à son contenu : la liste remplit toute la boîte, sans grand vide en dessous.",
+    "L'espace récupéré remonte aux jauges méta : les 7 jauges tiennent sans défilement.",
+  ] },
   { v: "0.5.7", date: "7 juillet 2026", titre: "Le scroll est mort, pour de bon", points: [
     "La page est désormais verrouillée à la taille de l'écran : il est structurellement impossible qu'elle défile.",
     "Si un onglet a vraiment trop de contenu (gros inventaire…), c'est sa fenêtre intérieure qui défile discrètement, comme dans tout jeu.",
@@ -2071,7 +2075,7 @@ const CSS = `
 .cinfo{ font-size:15.5px; } .note{ font-size:15px; } .btn{ font-size:13.5px; } .schip{ font-size:16px; }
 .invnom{ font-size:16px; } .invstats{ font-size:14px; } .slotit{ font-size:14.5px; } .slotvide{ font-size:13.5px; } .slotnom{ font-size:11.5px; }
 .jhead{ font-size:18px; margin-bottom:1px; } .jsrc{ font-size:15px; } .jpal{ font-size:16px; font-weight:700; } .jeff{ font-size:15px; margin-top:1px; font-weight:600; } .niv{ font-size:13px; }
-.jnom{ font-weight:700; } .jauge{ margin-bottom:8px; }
+.jnom{ font-weight:700; } .jauge{ margin-bottom:7px; }
 .jeff,.jsrc{ color:#e8edff; }
 .bartxt{ font-size:15px; font-weight:700; letter-spacing:.6px; color:#fff; text-shadow:0 1px 2px #000, 0 0 5px #000, 1px 1px 0 #000; }
 .pend{ font-size:13px; }
@@ -2102,8 +2106,8 @@ const CSS = `
 .zoneDroite .chips{ flex-wrap:wrap; overflow:visible; }
 .pcmd .cmdcol{ display:flex; flex-direction:column; gap:8px; }
 .pjournal{ grid-column:1 / -1; display:flex; flex-direction:column; min-height:120px; overflow:hidden; }
-.pnotifs{ width:100%; flex:0 0 auto; }
-.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:52px; overflow-y:auto; }
+.pnotifs{ width:100%; flex:0 0 122px; min-height:0; display:flex; flex-direction:column; }
+.notiflist{ display:flex; flex-direction:column; gap:4px; flex:1; min-height:0; overflow-y:auto; }
 .zoneDroite{ min-height:0; }
 .pstats{ min-height:0; }
 .ctitel{ font-size:14px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:9px; }
