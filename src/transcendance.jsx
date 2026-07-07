@@ -11,8 +11,16 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.7.1";
+const VERSION = "0.8.0";
 const CHANGELOG = [
+  { v: "0.8.0", date: "7 juillet 2026", titre: "Le grand vestiaire", points: [
+    "L'onglet Équipement occupe désormais toute la largeur : journal, commandes et notifications s'effacent pour te laisser gérer ton stuff (les stats de combat restent à droite).",
+    "Nouveau visuel d'équipement en compartiments autour de ton héros — survole pour les détails, clique pour affiner, clic droit pour verrouiller.",
+    "Vrai inventaire à cases : chaque objet dans sa case colorée par rareté, badges de tier et de verrou, survol pour les stats.",
+    "Tri automatique (rareté puis tier puis niveau) et filtres par type d'équipement (armes, anneaux, boucles…).",
+    "Ensembles d'équipement : sauvegarde ta panoplie actuelle, rééquipe-la en un clic, renomme-la, range-la dans des groupes. Les pièces liées à un ensemble sont automatiquement 🔗 verrouillées.",
+    "« Équiper le meilleur » configurable : construis ton ordre de priorité (Or → Attaque → PV…), et sauvegarde-le en profils réutilisables.",
+  ] },
   { v: "0.7.1", date: "7 juillet 2026", titre: "Finitions de forge", points: [
     "L'essence résiduelle brille désormais en rouge rubis, et son nom complet s'affiche dans le bandeau.",
     "Les ressources du bandeau sont encadrées d'un liseré doré — chaque monnaie a son écrin.",
@@ -972,9 +980,75 @@ function evoluerTier(G, itemId) {
   toast(G, it.nom + " évolue — Tier " + rome(it.t), RAR_BY_ID[it.rar].col);
   sfx("boss", meta.opts.sfx); G.saveNow = true;
 }
+/* ---------- ensembles d'équipement ----------
+   Une pièce liée à un ensemble est automatiquement verrouillée : pour la
+   déverrouiller, il faut la retirer de l'ensemble (ou supprimer l'ensemble). */
+function estLie(meta, itemId) {
+  return (meta.ensembles || []).some((e) => Object.values(e.items).includes(itemId));
+}
+const verrou = (meta, it) => !!(it.lock || estLie(meta, it.id));
 function basculerLock(G, itemId) {
   const it = trouverItem(G.meta, itemId); if (!it || it.nv) return;
+  if (estLie(G.meta, itemId)) { toast(G, "Pièce liée à un ensemble 🔗 — retire-la de l'ensemble pour la déverrouiller", "#ffd45e"); return; }
   it.lock = !it.lock; sfx("equip", G.meta.opts.sfx); G.saveNow = true;
+}
+function sauverEnsemble(G) {
+  const meta = G.meta;
+  const items = {};
+  for (const k in meta.equip) if (meta.equip[k] && !meta.equip[k].nv) items[k] = meta.equip[k].id;
+  if (!Object.keys(items).length) { toast(G, "Rien d'équipé à sauvegarder", "#ffd45e"); return; }
+  meta.ensembles.push({ id: uid(), nom: "Ensemble " + (meta.ensembles.length + 1), grp: meta.grpEns[0], items });
+  toast(G, "Ensemble sauvegardé (" + Object.keys(items).length + " pièces) — renomme-le avec ✎", "#8be05f");
+  sfx("tier", meta.opts.sfx); G.saveNow = true;
+}
+function equiperEnsemble(G, ensId) {
+  const meta = G.meta, ens = meta.ensembles.find((e) => e.id === ensId); if (!ens) return;
+  let manque = 0;
+  for (const slotId in ens.items) {
+    const iid = ens.items[slotId];
+    if (meta.equip[slotId] && meta.equip[slotId].id === iid) continue;
+    let it = null;
+    const ii = meta.inv.findIndex((x) => x.id === iid);
+    if (ii >= 0) it = meta.inv.splice(ii, 1)[0];
+    else for (const k in meta.equip) if (meta.equip[k] && meta.equip[k].id === iid && k !== slotId) { it = meta.equip[k]; meta.equip[k] = null; break; }
+    if (!it) { manque++; continue; }
+    const old = meta.equip[slotId];
+    meta.equip[slotId] = it;
+    if (old) meta.inv.unshift(old);
+  }
+  toast(G, "« " + ens.nom + " » équipé" + (manque ? " — " + manque + " pièce(s) introuvable(s)" : ""), "#8be05f");
+  sfx("equip", meta.opts.sfx); G.saveNow = true;
+}
+function supprimerEnsemble(G, ensId) {
+  const meta = G.meta;
+  meta.ensembles = meta.ensembles.filter((e) => e.id !== ensId);
+  G.saveNow = true;
+}
+/* ---------- priorités d'équipement automatique ---------- */
+const GRP_STATS = [
+  { id: "or", nom: "Or", stats: { goldP: 1 } },
+  { id: "atq", nom: "Attaque", stats: { atkP: 1, atkF: 0.2 } },
+  { id: "pv", nom: "PV", stats: { hpP: 1, hpF: 0.06 } },
+  { id: "crit", nom: "Critique", stats: { critC: 2, critD: 1 } },
+  { id: "vit", nom: "Vitesse", stats: { asP: 1 } },
+  { id: "def", nom: "Défense", stats: { defF: 1 } },
+  { id: "boss", nom: "Boss", stats: { vsBossP: 1 } },
+  { id: "jauges", nom: "Jauges", stats: { gaugeP: 1 } },
+];
+const GRP_BY_ID = Object.fromEntries(GRP_STATS.map((g) => [g.id, g]));
+function scoreGroupe(it, g) { const se = statsEff(it); let s = 0; for (const k in g.stats) s += (se[k] || 0) * g.stats[k]; return s; }
+function cmpPrio(a, b, ordres) {
+  for (const gid of ordres) {
+    const g = GRP_BY_ID[gid]; if (!g) continue;
+    const d = scoreGroupe(b, g) - scoreGroupe(a, g);
+    if (Math.abs(d) > 0.001) return d;
+  }
+  return scoreItem(b) - scoreItem(a);
+}
+function trierInventaire(G) {
+  const idx = Object.fromEntries(RARS.map((r, i) => [r.id, i]));
+  G.meta.inv.sort((a, b) => (idx[b.rar] - idx[a.rar]) || ((b.t || 1) - (a.t || 1)) || (b.ilvl - a.ilvl) || ((b.a || 0) - (a.a || 0)));
+  G.saveNow = true; sfx("equip", G.meta.opts.sfx);
 }
 function equipTotals(meta) {
   const t = { atkF: 0, atkP: 0, hpF: 0, hpP: 0, defF: 0, asP: 0, critC: 0, critD: 0, goldP: 0, vsBossP: 0, gaugeP: 0 };
@@ -1032,7 +1106,8 @@ function equiperMeilleur(G) {
     cibles.forEach((cid) => { if (meta.equip[cid]) cands.push(meta.equip[cid]); });
     meta.inv.forEach((it) => { if (slotsCibles(it.slot).join("+") === key) cands.push(it); });
     if (!cands.length) return;
-    cands.sort((a, b) => scoreItem(b) - scoreItem(a));
+    const ordres = (meta.prios && meta.prios.ordres) || [];
+    cands.sort((a, b) => (ordres.length ? cmpPrio(a, b, ordres) : scoreItem(b) - scoreItem(a)));
     const top = [];
     for (const c of cands) {
       if (top.length >= cibles.length) break;
@@ -1128,6 +1203,9 @@ function metaInitiale() {
     armeTChoix: null,
     ferraille: 0,
     essence: 0,
+    ensembles: [],
+    grpEns: ["Général"],
+    prios: { ordres: [], list: [], actif: null },
   };
 }
 function runInitiale() {
@@ -1387,7 +1465,7 @@ function equiper(G, itemId, slotCible) {
 function vendreItem(G, itemId) {
   const meta = G.meta;
   const i = meta.inv.findIndex((x) => x.id === itemId); if (i < 0) return;
-  if (meta.inv[i].lock) { toast(G, "Équipement verrouillé — déverrouille-le d'abord", "#ffd45e"); return; }
+  if (verrou(meta, meta.inv[i])) { toast(G, "Équipement verrouillé — déverrouille-le d'abord", "#ffd45e"); return; }
   const v = prixFerraille(meta.inv[i]);
   meta.ferraille += v;
   meta.inv.splice(i, 1);
@@ -1396,7 +1474,7 @@ function vendreItem(G, itemId) {
 }
 function vendreRarete(G, rarId) {
   const meta = G.meta; let tot = 0, n = 0;
-  meta.inv = meta.inv.filter((it) => { if (it.rar === rarId && !it.lock) { tot += prixFerraille(it); n++; return false; } return true; });
+  meta.inv = meta.inv.filter((it) => { if (it.rar === rarId && !verrou(meta, it)) { tot += prixFerraille(it); n++; return false; } return true; });
   if (tot > 0) { meta.ferraille += tot; toast(G, n + " objet" + (n > 1 ? "s" : "") + " " + RAR_BY_ID[rarId].nom.toLowerCase() + (n > 1 ? "s" : "") + " → +" + fmt(tot) + " ⚒", RAR_BY_ID[rarId].col); sfx("coin", meta.opts.sfx); G.saveNow = true; }
 }
 function ameliorerStance(G, id) {
@@ -1482,11 +1560,20 @@ function depuisSave(d) {
     meta.armeTChoix = typeof d.meta.armeTChoix === "string" ? d.meta.armeTChoix : null;
     meta.ferraille = d.meta.ferraille || 0;
     meta.essence = d.meta.essence || 0;
+    meta.ensembles = Array.isArray(d.meta.ensembles) ? d.meta.ensembles : [];
+    meta.grpEns = Array.isArray(d.meta.grpEns) && d.meta.grpEns.length ? d.meta.grpEns : ["Général"];
+    if (d.meta.prios) {
+      meta.prios.ordres = Array.isArray(d.meta.prios.ordres) ? d.meta.prios.ordres : [];
+      meta.prios.list = Array.isArray(d.meta.prios.list) ? d.meta.prios.list : [];
+      meta.prios.actif = d.meta.prios.actif || null;
+    }
     /* v0.5.0 : les armes de Transcendance ne sont plus des drops — on purge
        les anciennes de l'inventaire, l'arme équipée est re-dérivée plus bas. */
     meta.inv = meta.inv.filter((it) => it.slot !== "armeT");
     let mx = 0; meta.inv.forEach((i) => { mx = Math.max(mx, typeof i.id === "number" ? i.id : 0); });
     for (const k in meta.equip) if (meta.equip[k]) mx = Math.max(mx, typeof meta.equip[k].id === "number" ? meta.equip[k].id : 0);
+    meta.ensembles.forEach((e) => { mx = Math.max(mx, typeof e.id === "number" ? e.id : 0); });
+    meta.prios.list.forEach((p) => { mx = Math.max(mx, typeof p.id === "number" ? p.id : 0); });
     UID = mx + 1;
     meta.equip.armeT = armeTEquipee(meta);
   }
@@ -1745,10 +1832,16 @@ function AffinageCtrl({ G, it, maj }) {
   );
 }
 
+const DOLL_G = ["armeP", "armeS", "armeT", "armure", "gants", "bottes"];
+const DOLL_D = ["amulette", "anneau1", "anneau2", "boucle1", "boucle2"];
+const FAM_ICO = { arme: "armeP", anneau: "anneau", boucle: "boucle", amulette: "amulette", armure: "armure", bottes: "bottes", gants: "gants" };
+
 function TabEquipement({ G, sel, setSel, maj }) {
   const meta = G.meta;
   const [cible, setCible] = useState(null);
   const [selEq, setSelEq] = useState(null);
+  const [filtre, setFiltre] = useState("tout");
+  const [edit, setEdit] = useState(null);
   const selIt = sel != null ? meta.inv.find((x) => x.id === sel) : null;
   const eqIt = selEq && meta.equip[selEq] ? meta.equip[selEq] : null;
   const cibles = selIt ? slotsCibles(selIt.slot) : [];
@@ -1757,28 +1850,34 @@ function TabEquipement({ G, sel, setSel, maj }) {
   const seSel = selIt ? statsEff(selIt) : null;
   const seEq = eqSel ? statsEff(eqSel) : null;
   const cles = selIt ? Array.from(new Set([...Object.keys(seSel), ...(seEq ? Object.keys(seEq) : [])])) : [];
-  const nbRar = Object.fromEntries(RARS.map((r) => [r.id, meta.inv.filter((it) => it.rar === r.id && !it.lock).length]));
+  const nbRar = Object.fromEntries(RARS.map((r) => [r.id, meta.inv.filter((it) => it.rar === r.id && !verrou(meta, it)).length]));
   const recy = meta.recy;
+  const invFiltre = filtre === "tout" ? meta.inv : meta.inv.filter((it) => fam(it.slot) === filtre);
+  const Case = (s) => {
+    const it = meta.equip[s.id];
+    const locked = s.trans && maxTrans(meta) < 1;
+    return (
+      <div key={s.id} className={"dcase" + (locked ? " locked" : "") + (selEq === s.id ? " selrow" : "")}
+        title={locked ? "Transcende une zone pour déverrouiller" : it ? it.nom + " · " + RAR_BY_ID[it.rar].nom + " · niv " + it.ilvl : s.nom + " (vide)"}
+        style={it ? { borderColor: RAR_BY_ID[it.rar].col } : null}
+        onClick={() => { if (it) { setSelEq(selEq === s.id ? null : s.id); setSel(null); } }}
+        onContextMenu={(e) => { e.preventDefault(); if (it) { basculerLock(G, it.id); maj(); } }}>
+        <Spr id={s.ico} scale={4} silhouette={!it} />
+        {it && verrou(meta, it) ? <span className="dlock">{estLie(meta, it.id) ? "🔗" : "🔒"}</span> : null}
+        {it && ((it.t || 1) > 1 || (it.a || 0) > 0) ? <span className="dtier">T{rome(it.t || 1)}{it.a ? "·" + it.a : ""}</span> : null}
+        <div className="dnom" style={it ? { color: RAR_BY_ID[it.rar].col } : null}>{s.nom}</div>
+      </div>
+    );
+  };
   return (
     <div>
-      <div className="paperdoll">
-        {SLOTS.map((s) => {
-          const it = meta.equip[s.id];
-          const locked = s.trans && maxTrans(meta) < 1;
-          return (
-            <div key={s.id} className={"slot" + (locked ? " locked" : "") + (selEq === s.id ? " selrow" : "")} style={{ borderColor: it ? RAR_BY_ID[it.rar].col : undefined, cursor: it ? "pointer" : "default" }}
-              onClick={() => { if (it) { setSelEq(selEq === s.id ? null : s.id); setSel(null); } }}
-              onContextMenu={(e) => { e.preventDefault(); if (it) { basculerLock(G, it.id); maj(); } }}>
-              <Spr id={s.ico} scale={3} />
-              <div className="slotinfo">
-                <div className="slotnom">{s.nom}</div>
-                {locked ? <div className="slotvide">verrouillé — transcende la Forêt</div>
-                  : it ? <div className="slotit" style={{ color: RAR_BY_ID[it.rar].col }}>{it.lock ? "🔒 " : ""}{it.nom}{(it.t || 1) > 1 || (it.a || 0) > 0 ? " · T" + rome(it.t || 1) + (it.a ? "+" + it.a : "") : ""} · niv {it.ilvl}</div>
-                  : <div className="slotvide">vide</div>}
-              </div>
-            </div>
-          );
-        })}
+      <div className="doll">
+        <div className="dollcol">{DOLL_G.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
+        <div className="dollmid">
+          <Spr id="hero" scale={7} flip />
+          <div className="cinfo dim" style={{ textAlign: "center" }}>clic : détail · clic droit : 🔒</div>
+        </div>
+        <div className="dollcol">{DOLL_D.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
       </div>
       {eqIt ? (
         <div className="carte detail" style={{ borderColor: RAR_BY_ID[eqIt.rar].col }}>
@@ -1810,6 +1909,71 @@ function TabEquipement({ G, sel, setSel, maj }) {
         </div>
       ) : null}
       <div className="carte" style={{ marginBottom: 10 }}>
+        <div className="ctitre small">🧰 Ensembles d'équipement <span className="niv">équipe une panoplie en un clic · les pièces liées sont 🔗 verrouillées</span>
+          <button className="btn mini" onClick={() => { sauverEnsemble(G); maj(); }}>+ Sauver l'équipement actuel</button>
+          <button className="btn mini ghost" onClick={() => { meta.grpEns.push("Groupe " + (meta.grpEns.length + 1)); G.saveNow = true; maj(); }}>+ Groupe</button>
+        </div>
+        {meta.ensembles.length === 0 ? <div className="cinfo dim">Équipe ta panoplie idéale puis clique « + Sauver l'équipement actuel » — tu pourras la rééquiper d'un clic (ex. un ensemble « Farm Or »).</div> : null}
+        {meta.grpEns.map((grp, gi) => (
+          <div key={gi}>
+            {(meta.ensembles.length > 0 || meta.grpEns.length > 1) ? (
+              <div className="cinfo togline grptitre">
+                {edit && edit.type === "grp" && edit.id === gi ? (
+                  <input className="inpt" autoFocus value={edit.val} onChange={(e) => setEdit({ ...edit, val: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") { const nv = edit.val.trim() || grp; meta.ensembles.forEach((en) => { if (en.grp === grp) en.grp = nv; }); meta.grpEns[gi] = nv; G.saveNow = true; setEdit(null); maj(); } if (e.key === "Escape") setEdit(null); }} />
+                ) : <b>▸ {grp}</b>}
+                <button className="btn mini ghost" title="Renommer le groupe" onClick={() => setEdit({ type: "grp", id: gi, val: grp })}>✎</button>
+                {meta.grpEns.length > 1 && !meta.ensembles.some((e) => e.grp === grp) ? (
+                  <button className="btn mini ghost danger" title="Supprimer le groupe (vide)" onClick={() => { meta.grpEns.splice(gi, 1); G.saveNow = true; maj(); }}>✕</button>
+                ) : null}
+              </div>
+            ) : null}
+            {meta.ensembles.filter((e) => e.grp === grp).map((e) => (
+              <div key={e.id} className="cinfo togline ensrow">
+                {edit && edit.type === "ens" && edit.id === e.id ? (
+                  <input className="inpt" autoFocus value={edit.val} onChange={(ev) => setEdit({ ...edit, val: ev.target.value })}
+                    onKeyDown={(ev) => { if (ev.key === "Enter") { e.nom = edit.val.trim() || e.nom; G.saveNow = true; setEdit(null); maj(); } if (ev.key === "Escape") setEdit(null); }} />
+                ) : <span><b>{e.nom}</b> <span className="dim">({Object.keys(e.items).length} pièces)</span></span>}
+                <button className="btn mini" onClick={() => { equiperEnsemble(G, e.id); maj(); }}>Équiper</button>
+                <button className="btn mini ghost" title="Renommer" onClick={() => setEdit({ type: "ens", id: e.id, val: e.nom })}>✎</button>
+                {meta.grpEns.length > 1 ? <button className="btn mini ghost" title="Déplacer vers le groupe suivant" onClick={() => { e.grp = meta.grpEns[(meta.grpEns.indexOf(e.grp) + 1) % meta.grpEns.length]; G.saveNow = true; maj(); }}>⇄</button> : null}
+                <button className="btn mini ghost danger" title="Supprimer l'ensemble (délie ses pièces)" onClick={() => { supprimerEnsemble(G, e.id); maj(); }}>✕</button>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="carte" style={{ marginBottom: 10 }}>
+        <div className="ctitre small">🎯 Priorités d'« Équiper le meilleur » <span className="niv">clique pour bâtir l'ordre · vide = équilibre général</span></div>
+        <div className="cinfo togline">{GRP_STATS.map((g) => {
+          const pos = meta.prios.ordres.indexOf(g.id);
+          return (
+            <button key={g.id} className={"btn mini" + (pos >= 0 ? " on" : " ghost")}
+              onClick={() => { if (pos >= 0) meta.prios.ordres.splice(pos, 1); else meta.prios.ordres.push(g.id); meta.prios.actif = null; G.saveNow = true; maj(); }}>
+              {pos >= 0 ? (pos + 1) + "· " : ""}{g.nom}
+            </button>
+          );
+        })}
+        {meta.prios.ordres.length ? <button className="btn mini ghost" onClick={() => { meta.prios.ordres = []; meta.prios.actif = null; G.saveNow = true; maj(); }}>Vider</button> : null}
+        </div>
+        <div className="cinfo togline">Profils :
+          {meta.prios.list.length === 0 ? <span className="dim">aucun — bâtis un ordre puis sauvegarde-le</span> : null}
+          {meta.prios.list.map((p) => (
+            <span key={p.id} className="togline">
+              <button className={"btn mini" + (meta.prios.actif === p.id ? " on" : "")} title={p.ordres.map((x) => GRP_BY_ID[x] ? GRP_BY_ID[x].nom : x).join(" → ")}
+                onClick={() => { meta.prios.ordres = p.ordres.slice(); meta.prios.actif = p.id; G.saveNow = true; maj(); }}>{p.nom}</button>
+              <button className="btn mini ghost danger" onClick={() => { meta.prios.list = meta.prios.list.filter((x) => x.id !== p.id); if (meta.prios.actif === p.id) meta.prios.actif = null; G.saveNow = true; maj(); }}>✕</button>
+            </span>
+          ))}
+          {meta.prios.ordres.length ? (
+            edit && edit.type === "prof" ? (
+              <input className="inpt" autoFocus placeholder="Nom du profil…" value={edit.val} onChange={(e) => setEdit({ ...edit, val: e.target.value })}
+                onKeyDown={(e) => { if (e.key === "Enter" && edit.val.trim()) { const p = { id: uid(), nom: edit.val.trim(), ordres: meta.prios.ordres.slice() }; meta.prios.list.push(p); meta.prios.actif = p.id; G.saveNow = true; setEdit(null); maj(); } if (e.key === "Escape") setEdit(null); }} />
+            ) : <button className="btn mini" onClick={() => setEdit({ type: "prof", val: "" })}>💾 Sauver ce profil</button>
+          ) : null}
+        </div>
+      </div>
+      <div className="carte" style={{ marginBottom: 10 }}>
         <div className="ctitre small">♻ Recyclage automatique <span className="niv">le butin qui matche est vendu dès qu'il tombe</span>
           <button className={"btn mini" + (recy.on ? " on" : "")} onClick={() => { recy.on = !recy.on; G.saveNow = true; maj(); }}>{recy.on ? "ACTIF" : "INACTIF"}</button>
         </div>
@@ -1832,12 +1996,23 @@ function TabEquipement({ G, sel, setSel, maj }) {
         ) : null}
       </div>
       <div className="invhead">
-        <span>Inventaire <b>{meta.inv.length}</b>/60 <span className="dim">(persiste entre les runs)</span></span>
+        <span>Inventaire <b>{meta.inv.length}</b>/60</span>
+        <button className="btn mini" onClick={() => { trierInventaire(G); maj(); }}>⇅ Tri auto</button>
         <button className="btn" onClick={() => { equiperMeilleur(G); setSel(null); setCible(null); maj(); }}>⚡ Équiper le meilleur</button>
-        <span className="vendrow">Vendre : {RARS.map((r) => (
+        <span className="vendrow">Recycler : {RARS.map((r) => (
           <button key={r.id} className="btn mini ghost" style={{ borderColor: r.col, color: r.col }} disabled={!nbRar[r.id]}
             onClick={() => { vendreRarete(G, r.id); setSel(null); maj(); }}>{r.nom}s ({nbRar[r.id]})</button>
         ))}</span>
+      </div>
+      <div className="invhead">
+        <span className="vendrow">Filtre :
+          <button className={"btn mini" + (filtre === "tout" ? " on" : " ghost")} onClick={() => setFiltre("tout")}>Tout</button>
+          {FAMS.map((f) => (
+            <button key={f.id} className={"btn mini filtrico" + (filtre === f.id ? " on" : " ghost")} title={f.nom} onClick={() => setFiltre(filtre === f.id ? "tout" : f.id)}>
+              <Spr id={FAM_ICO[f.id]} scale={2} /> {f.nom}
+            </button>
+          ))}
+        </span>
       </div>
       {selIt ? (
         <div className="carte detail" style={{ borderColor: RAR_BY_ID[selIt.rar].col }}>
@@ -1867,22 +2042,20 @@ function TabEquipement({ G, sel, setSel, maj }) {
           </div>
         </div>
       ) : null}
-      <div className="invlist">
-        {meta.inv.length === 0 ? <p className="note">Rien pour l'instant. Les monstres lâchent leur butin en mourant — 5% sur un monstre, 45% sur un boss de niveau, garanti sur le boss de zone. Astuce : clic droit sur un objet pour le 🔒 verrouiller.</p> : null}
-        {meta.inv.map((it) => {
-          const se = statsEff(it);
-          return (
-            <div key={it.id} className={"invrow" + (sel === it.id ? " selrow" : "")} onClick={() => { setSel(it.id); setCible(null); setSelEq(null); }}
-              onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
-              <Spr id={SLOT_BY_ID[it.slot].ico} scale={2} />
-              <span className="invnom" style={{ color: RAR_BY_ID[it.rar].col }}>{it.lock ? "🔒 " : ""}{it.nom}</span>
-              <span className="slottag dim">{SLOT_BY_ID[it.slot].nom}</span>
-              {(it.t || 1) > 1 || (it.a || 0) > 0 ? <span className="slottag" style={{ color: RAR_BY_ID[it.rar].col, borderColor: RAR_BY_ID[it.rar].col }}>T{rome(it.t || 1)} · {it.a || 0}/10</span> : null}
-              <span className="dim">niv {it.ilvl}</span>
-              <span className="invstats dim">{Object.keys(se).map((k) => "+" + fmt(se[k]) + " " + NOM_ISTAT[k]).join(" · ")}</span>
-            </div>
-          );
-        })}
+      {meta.inv.length === 0 ? <p className="note">Rien pour l'instant. Les monstres lâchent leur butin en mourant — 5% sur un monstre, 45% sur un boss de niveau, garanti sur le boss de zone. Astuce : clic droit sur un objet pour le 🔒 verrouiller.</p> : null}
+      <div className="invgrid">
+        {invFiltre.map((it) => (
+          <div key={it.id} className={"icell" + (sel === it.id ? " selrow" : "")}
+            title={it.nom + " · " + RAR_BY_ID[it.rar].nom + " · niv " + it.ilvl + ((it.t || 1) > 1 || (it.a || 0) > 0 ? " · T" + rome(it.t || 1) + " " + (it.a || 0) + "/10" : "") + "\n" + Object.entries(statsEff(it)).map(([k, v]) => "+" + fmt(v) + " " + NOM_ISTAT[k]).join(" · ")}
+            style={{ borderColor: RAR_BY_ID[it.rar].col }}
+            onClick={() => { setSel(sel === it.id ? null : it.id); setCible(null); setSelEq(null); }}
+            onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
+            <Spr id={SLOT_BY_ID[it.slot].ico} scale={3} />
+            {verrou(meta, it) ? <span className="ilock">{estLie(meta, it.id) ? "🔗" : "🔒"}</span> : null}
+            {(it.t || 1) > 1 || (it.a || 0) > 0 ? <span className="itier">T{rome(it.t || 1)}</span> : null}
+          </div>
+        ))}
+        {filtre === "tout" ? Array.from({ length: Math.max(0, 60 - meta.inv.length) }).map((_, i) => <div key={"v" + i} className="icell vide" />) : null}
       </div>
     </div>
   );
@@ -2265,6 +2438,32 @@ const CSS = `
 .slottag{ font-size:11px; text-transform:uppercase; letter-spacing:.5px; border:1px solid var(--line); border-radius:4px; padding:1px 6px; font-family:'Cinzel', Georgia, serif; }
 .vendrow{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
 .togline{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
+.colonnes.modeEquip{ grid-template-columns:minmax(0,1fr) 340px; }
+.colonnes.modeEquip .zoneDroite{ grid-template-columns:1fr; }
+.doll{ display:flex; gap:14px; justify-content:center; align-items:stretch; margin-bottom:10px; }
+.dollcol{ display:flex; flex-direction:column; gap:6px; }
+.dollmid{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; flex:0 1 340px;
+  background:radial-gradient(300px 200px at 50% 40%, rgba(126,224,110,.10) 0%, rgba(0,0,0,.28) 70%); border:2px solid var(--line); border-radius:16px; padding:10px 20px; }
+.dcase{ position:relative; width:82px; border:2px solid #39406a; border-radius:10px; background:var(--panel2); display:flex; flex-direction:column; align-items:center; padding:7px 4px 4px; cursor:pointer; }
+.dcase:hover{ background:#2c345c; }
+.dcase.locked{ opacity:.45; cursor:default; }
+.dcase.selrow{ outline:2px solid var(--cyan); }
+.dcase .px{ margin:0 auto; }
+.dnom{ font-size:9px; color:var(--dim); text-transform:uppercase; letter-spacing:.3px; text-align:center; line-height:1.15; margin-top:4px; font-family:'Cinzel', Georgia, serif; }
+.dlock{ position:absolute; top:2px; right:3px; font-size:11px; }
+.dtier{ position:absolute; top:2px; left:4px; font-size:10px; color:var(--gold); font-weight:700; }
+.invgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(58px, 1fr)); gap:6px; }
+.icell{ position:relative; aspect-ratio:1/1; border:2px solid #39406a; border-radius:9px; background:rgba(0,0,0,.25); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+.icell:hover{ background:rgba(255,255,255,.06); }
+.icell.vide{ opacity:.3; cursor:default; }
+.icell.selrow{ outline:2px solid var(--cyan); }
+.ilock{ position:absolute; top:0px; right:2px; font-size:10px; }
+.itier{ position:absolute; bottom:0px; left:4px; font-size:9.5px; color:var(--gold); font-weight:700; }
+.filtrico{ display:inline-flex; align-items:center; gap:4px; }
+.ensrow{ padding-left:16px; }
+.grptitre{ margin-top:4px; }
+.inpt{ background:#12162a; border:2px solid var(--line); border-radius:6px; color:var(--txt); padding:2px 8px; font-family:inherit; font-size:14px; width:180px; }
+.btn.mini.danger{ border-color:var(--rouge); color:var(--rouge); }
 .numin{ width:76px; background:#12162a; border:2px solid var(--line); border-radius:6px; color:var(--txt); padding:3px 6px; font-family:inherit; font-size:15px; }
 @media (max-width:1560px){ .zoneDroite{ grid-template-columns:280px 330px; } }
 @media (max-width:1200px){ .colonnes{ grid-template-columns:1fr; } .colcote{ position:static; } .zoneDroite{ grid-template-columns:1fr 1fr; } .pstats,.pjournal{ height:330px; } }
@@ -2370,7 +2569,7 @@ export default function Transcendance() {
           </button>
         ))}
       </div>
-      <div className="colonnes">
+      <div className={"colonnes" + (tab === "equip" ? " modeEquip" : "")}>
         <div className="colG">
           <div className="panneau">
             {tab === "boutique" ? <TabBoutique G={G} maj={maj} /> : null}
@@ -2400,7 +2599,7 @@ export default function Transcendance() {
               ))}
             </div>
           </div>
-          <div className="panneau pcmd">
+          <div className="panneau pcmd" style={tab === "equip" ? { display: "none" } : null}>
             <div className="ctitel">Commandes</div>
             <div className="cmdcol">
               <button className={"btn" + (G.meta.opts.autoRelance ? " on" : "")} title="AFK farm : relance automatiquement une run après la mort" onClick={() => { G.meta.opts.autoRelance = !G.meta.opts.autoRelance; G.saveNow = true; maj(); }}>⟳ AFK {G.meta.opts.autoRelance ? "· ACTIF" : ""}</button>
@@ -2409,7 +2608,7 @@ export default function Transcendance() {
               <button className="btn" onClick={() => setOpts(true)}>⚙ PARAMÈTRES</button>
             </div>
           </div>
-          <div className="panneau pjournal">
+          <div className="panneau pjournal" style={tab === "equip" ? { display: "none" } : null}>
             <div className="ctitel">Journal de combat</div>
             <div className="loglist">
               {(G.log || []).length === 0 ? <div className="dim">Le combat commence…</div> : null}
@@ -2418,7 +2617,7 @@ export default function Transcendance() {
           </div>
         </div>
       </div>
-      <div className="panneau pnotifs">
+      <div className="panneau pnotifs" style={tab === "equip" ? { display: "none" } : null}>
         <div className="ctitel">Notifications</div>
         <div className="notiflist">
           {G.toasts.length === 0 ? <div className="dim">Rien à signaler pour l'instant.</div> : null}
