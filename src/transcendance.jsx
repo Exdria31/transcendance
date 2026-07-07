@@ -11,8 +11,13 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.6";
+const VERSION = "0.5.7";
 const CHANGELOG = [
+  { v: "0.5.7", date: "7 juillet 2026", titre: "Le scroll est mort, pour de bon", points: [
+    "La page est désormais verrouillée à la taille de l'écran : il est structurellement impossible qu'elle défile.",
+    "Si un onglet a vraiment trop de contenu (gros inventaire…), c'est sa fenêtre intérieure qui défile discrètement, comme dans tout jeu.",
+    "En-tête compacté et barres légèrement affinées pour que la Boutique tienne sans défiler du tout.",
+  ] },
   { v: "0.5.6", date: "7 juillet 2026", titre: "Contours, cadrage & meilleur équipement", points: [
     "Tous les textes ont maintenant un contour noir de 1px, façon jeu vidéo — lisibles sur n'importe quel fond.",
     "La scène de combat est recadrée : héros et monstres tiennent entièrement dans le cadre.",
@@ -1561,7 +1566,7 @@ function TabBoutique({ G, maj }) {
           </div>
         ))}
       </div>
-      <div className="msep" style={{ marginTop: 14 }}>JAUGES MÉTA</div>
+      <div className="msep" style={{ marginTop: 6 }}>JAUGES MÉTA</div>
       <TabJauges G={G} />
     </div>
   );
@@ -1585,7 +1590,7 @@ function TabJauges({ G }) {
               {pend > 0 ? <span className="pend">+{pend} palier{pend > 1 ? "s" : ""} en attente</span> : null}
               <span className="jpal" style={{ color: g.col }}>palier {gs.applied}{pend > 0 ? " → " + t : ""}</span>
             </div>
-            <Bar v={gs.total - deja} max={prochain - deja} col={g.col} h={24} glow={pend > 0} txt={F(gs.total - deja) + " / " + F(prochain - deja)} />
+            <Bar v={gs.total - deja} max={prochain - deja} col={g.col} h={20} glow={pend > 0} txt={F(gs.total - deja) + " / " + F(prochain - deja)} />
             <div className="jeff">{g.eff} — actif : <b style={{ color: g.col }}>{g.rabais ? "−" + (100 * (1 - Math.pow(0.99, gs.applied))).toFixed(1).replace(".", ",") + "%" : "+" + (gs.applied * g.par).toString().replace(".", ",") + "%"}</b>{g.id === "fortune" ? <span className="dim"> · or de la run en attente : +{fmtM(G.run.gold)}</span> : null}</div>
           </div>
         );
@@ -1935,7 +1940,7 @@ const CSS = `
 .trx{ --bg:#161b2e; --panel:#1f2540; --panel2:#262d4d; --line:#3a4270; --txt:#ffffff; --dim:#ccd6f4; --leaf:#7ee06e; --gold:#ffd45e; --cyan:#6ad4ff; --violet:#c59bff; --rouge:#ff6b6b;
   background: radial-gradient(1200px 500px at 50% -10%, #2a3358 0%, #161b2e 60%), #161b2e;
   color:var(--txt); font-family:'Jost', 'Segoe UI', sans-serif; font-size:16px; font-weight:500; line-height:1.4;
-  min-height:100vh; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box; overflow-x:clip;
+  height:100vh; overflow:hidden; padding:8px 14px; display:flex; flex-direction:column; gap:8px; width:100%; margin:0 auto; box-sizing:border-box;
   text-shadow:-1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 -1px 0 #000, 0 1px 0 #000, -1px 0 0 #000, 1px 0 0 #000; }
 .trx *{ box-sizing:border-box; }
 .trx b{ font-weight:700; }
@@ -2079,19 +2084,28 @@ const CSS = `
 .jauge{ margin-bottom:8px; }
 .panneau{ padding:10px 12px; }
 .toast{ padding:4px 9px; font-size:14px; }
-.titre{ font-size:17px; letter-spacing:5px; } .stitre{ font-size:8px; }
+.entete{ display:flex; align-items:baseline; justify-content:center; gap:12px; flex:0 0 auto; }
+.titre{ font-size:16px; letter-spacing:5px; margin:0; }
+.stitre{ font-size:8px; letter-spacing:2px; }
 .carte{ padding:8px; gap:3px; }
-.colonnes{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(380px,0.9fr); gap:8px; align-items:stretch; }
-.colG{ display:flex; flex-direction:column; gap:8px; min-width:0; }
-.colG .panneau{ flex:1; }
+.topbar,.scene,.tabsbar{ flex:0 0 auto; }
+.colonnes{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(380px,0.9fr); gap:8px; align-items:stretch; flex:1; min-height:0; }
+.colG{ display:flex; flex-direction:column; gap:8px; min-width:0; min-height:0; }
+.colG .panneau{ flex:1; min-height:0; overflow-y:auto; }
+.trx ::-webkit-scrollbar{ width:9px; height:9px; }
+.trx ::-webkit-scrollbar-track{ background:transparent; }
+.trx ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:5px; }
+.trx ::-webkit-scrollbar-thumb:hover{ background:#4d568a; }
 .zoneDroite{ display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto minmax(0,1fr); gap:8px; align-items:stretch; }
 .pcote{ min-height:0; }
 .pstats{ display:flex; flex-direction:column; overflow-y:auto; }
 .zoneDroite .chips{ flex-wrap:wrap; overflow:visible; }
 .pcmd .cmdcol{ display:flex; flex-direction:column; gap:8px; }
-.pjournal{ grid-column:1 / -1; display:flex; flex-direction:column; min-height:170px; overflow:hidden; }
-.pnotifs{ width:100%; }
-.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:66px; overflow-y:auto; }
+.pjournal{ grid-column:1 / -1; display:flex; flex-direction:column; min-height:120px; overflow:hidden; }
+.pnotifs{ width:100%; flex:0 0 auto; }
+.notiflist{ display:flex; flex-direction:column; gap:4px; max-height:52px; overflow-y:auto; }
+.zoneDroite{ min-height:0; }
+.pstats{ min-height:0; }
 .ctitel{ font-size:14px; letter-spacing:2px; color:var(--dim); text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:9px; }
 .statcol{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .statcol .schip{ display:flex; justify-content:space-between; align-items:baseline; }
@@ -2183,10 +2197,7 @@ export default function Transcendance() {
   return (
     <div className="trx">
       <style>{CSS}</style>
-      <div>
-        <div className="titre">TRANSCENDANCE</div>
-        <div className="stitre">idle roguelite — v{VERSION}</div>
-      </div>
+      <div className="entete"><span className="titre">TRANSCENDANCE</span><span className="stitre">idle roguelite — v{VERSION}</span></div>
       <div className="topbar">
         <span className="tbside tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
         <span className="tbcentre">
