@@ -11,8 +11,14 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.8.0";
+const VERSION = "0.8.1";
 const CHANGELOG = [
+  { v: "0.8.1", date: "7 juillet 2026", titre: "Le vestiaire prend ses aises", points: [
+    "L'onglet Équipement est réagencé en trois panneaux : détails de la pièce sélectionnée à gauche, personnage au centre, inventaire à droite — plus d'espace perdu.",
+    "Quatre boutons à droite ouvrent leurs fenêtres dédiées : Ensembles (E E), Priorités (PE), Recyclage auto (RA) et Armes de Transcendance (AT).",
+    "Les statistiques de combat sont catégorisées : Offensives, Défensives, Bonus, Divers — avec deux nouvelles lignes (dégâts boss, remplissage des jauges).",
+    "Les stances ne s'affichent plus dans l'onglet Équipement.",
+  ] },
   { v: "0.8.0", date: "7 juillet 2026", titre: "Le grand vestiaire", points: [
     "L'onglet Équipement occupe désormais toute la largeur : journal, commandes et notifications s'effacent pour te laisser gérer ton stuff (les stats de combat restent à droite).",
     "Nouveau visuel d'équipement en compartiments autour de ton héros — survole pour les détails, clique pour affiner, clic droit pour verrouiller.",
@@ -1842,6 +1848,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
   const [selEq, setSelEq] = useState(null);
   const [filtre, setFiltre] = useState("tout");
   const [edit, setEdit] = useState(null);
+  const [fenetre, setFenetre] = useState(null);
   const selIt = sel != null ? meta.inv.find((x) => x.id === sel) : null;
   const eqIt = selEq && meta.equip[selEq] ? meta.equip[selEq] : null;
   const cibles = selIt ? slotsCibles(selIt.slot) : [];
@@ -1870,26 +1877,109 @@ function TabEquipement({ G, sel, setSel, maj }) {
     );
   };
   return (
-    <div>
-      <div className="doll">
-        <div className="dollcol">{DOLL_G.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
-        <div className="dollmid">
-          <Spr id="hero" scale={7} flip />
-          <div className="cinfo dim" style={{ textAlign: "center" }}>clic : détail · clic droit : 🔒</div>
-        </div>
-        <div className="dollcol">{DOLL_D.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
+    <>
+    <div className="equipzone">
+      <div className="eqpanel eqinfo">
+        <div className="ctitel">Équipement sélectionné</div>
+        {selIt ? (
+          <div className="eqdetail" style={{ borderColor: RAR_BY_ID[selIt.rar].col }}>
+            <div className="ctitre"><Spr id={SLOT_BY_ID[selIt.slot].ico} scale={2} /> <span style={{ color: RAR_BY_ID[selIt.rar].col }}>{selIt.nom}</span> <span className="niv">{RAR_BY_ID[selIt.rar].nom} · niv {selIt.ilvl}</span></div>
+            {cibles.length > 1 ? (
+              <div className="cinfo togline">Destination : {cibles.map((cid) => (
+                <button key={cid} className={"btn mini" + (slotCible === cid ? " on" : " ghost")} onClick={() => setCible(cid)}>
+                  {SLOT_BY_ID[cid].nom}{meta.equip[cid] ? "" : " (vide)"}
+                </button>
+              ))}</div>
+            ) : null}
+            {cles.map((k) => {
+              const a = seSel[k] || 0, b = seEq ? (seEq[k] || 0) : 0, d = a - b;
+              return (
+                <div key={k} className="cinfo statline">
+                  <span>{NOM_ISTAT[k]}</span>
+                  <span><b>{a > 0 ? "+" + fmt(a) : "—"}</b>{eqSel ? <span className={"diff " + (d > 0 ? "up" : d < 0 ? "down" : "eq")}> {d > 0 ? "▲+" + fmt(d) : d < 0 ? "▼" + fmt(-d) : "="}</span> : null}</span>
+                </div>
+              );
+            })}
+            {eqSel ? <div className="cinfo dim">comparé à : {eqSel.nom} (niv {eqSel.ilvl}) — {SLOT_BY_ID[slotCible].nom}</div> : <div className="cinfo dim">{SLOT_BY_ID[slotCible].nom} : actuellement vide</div>}
+            <AffinageCtrl G={G} it={selIt} maj={maj} />
+            <div className="crow">
+              <button className="btn" onClick={() => { equiper(G, selIt.id, slotCible); setSel(null); setCible(null); maj(); }}>Équiper → {SLOT_BY_ID[slotCible].nom}</button>
+              <button className="btn ghost" disabled={verrou(meta, selIt)} onClick={() => { vendreItem(G, selIt.id); setSel(null); maj(); }}>{verrou(meta, selIt) ? "🔒 Verrouillé" : "Recycler +" + fmt(prixFerraille(selIt)) + " ⚒"}</button>
+              <button className="btn ghost" onClick={() => { setSel(null); setCible(null); }}>Fermer</button>
+            </div>
+          </div>
+        ) : eqIt ? (
+          <div className="eqdetail" style={{ borderColor: RAR_BY_ID[eqIt.rar].col }}>
+            <div className="ctitre"><Spr id={SLOT_BY_ID[eqIt.slot].ico} scale={2} /> <span style={{ color: RAR_BY_ID[eqIt.rar].col }}>{eqIt.nom}</span> <span className="niv">équipé — {SLOT_BY_ID[selEq].nom} · {RAR_BY_ID[eqIt.rar].nom} · niv {eqIt.ilvl}</span></div>
+            {Object.entries(statsEff(eqIt)).map(([k, v]) => <div key={k} className="cinfo statline"><span>{NOM_ISTAT[k]}</span><b>+{fmt(v)}</b></div>)}
+            <AffinageCtrl G={G} it={eqIt} maj={maj} />
+            <div className="crow"><button className="btn ghost" onClick={() => setSelEq(null)}>Fermer</button></div>
+          </div>
+        ) : (
+          <div className="cinfo dim" style={{ marginTop: 10 }}>Sélectionne une pièce d'équipement — dans l'inventaire à droite ou sur le personnage au centre — pour voir ses détails, la comparer, l'affiner et l'équiper.<br /><br />Astuce : clic droit = 🔒 verrouiller/déverrouiller.</div>
+        )}
       </div>
-      {eqIt ? (
-        <div className="carte detail" style={{ borderColor: RAR_BY_ID[eqIt.rar].col }}>
-          <div className="ctitre"><Spr id={SLOT_BY_ID[eqIt.slot].ico} scale={2} /> <span style={{ color: RAR_BY_ID[eqIt.rar].col }}>{eqIt.nom}</span> <span className="niv">équipé — {SLOT_BY_ID[selEq].nom} · {RAR_BY_ID[eqIt.rar].nom} · niv {eqIt.ilvl}</span></div>
-          {Object.entries(statsEff(eqIt)).map(([k, v]) => <div key={k} className="cinfo statline"><span>{NOM_ISTAT[k]}</span><b>+{fmt(v)}</b></div>)}
-          <AffinageCtrl G={G} it={eqIt} maj={maj} />
-          <div className="crow"><button className="btn ghost" onClick={() => setSelEq(null)}>Fermer</button></div>
+      <div className="eqpanel eqdoll">
+        <div className="ctitel">Personnage</div>
+        <div className="doll">
+          <div className="dollcol">{DOLL_G.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
+          <div className="dollmid">
+            <Spr id="hero" scale={6} flip />
+          </div>
+          <div className="dollcol">{DOLL_D.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
         </div>
-      ) : null}
-      {maxTrans(meta) >= 1 ? (
-        <div className="carte" style={{ marginBottom: 10, borderColor: "#6b46a8" }}>
-          <div className="ctitre">✦ Armes de Transcendance <span className="niv">uniques · indestructibles · la meilleure s'équipe seule</span></div>
+      </div>
+      <div className="eqpanel eqinv">
+        <div className="ctitel">Inventaire — {meta.inv.length}/60</div>
+        <div className="invhead">
+          <button className="btn mini" onClick={() => { trierInventaire(G); maj(); }}>⇅ Tri auto</button>
+          <button className="btn mini" onClick={() => { equiperMeilleur(G); setSel(null); setCible(null); maj(); }}>⚡ Équiper le meilleur</button>
+        </div>
+        <div className="invhead">
+          <span className="vendrow">
+            <button className={"btn mini" + (filtre === "tout" ? " on" : " ghost")} onClick={() => setFiltre("tout")}>Tout</button>
+            {FAMS.map((f) => (
+              <button key={f.id} className={"btn mini filtrico" + (filtre === f.id ? " on" : " ghost")} title={f.nom} onClick={() => setFiltre(filtre === f.id ? "tout" : f.id)}>
+                <Spr id={FAM_ICO[f.id]} scale={2} />
+              </button>
+            ))}
+          </span>
+        </div>
+        <div className="invhead">
+          <span className="vendrow">Recycler : {RARS.map((r) => (
+            <button key={r.id} className="btn mini ghost" style={{ borderColor: r.col, color: r.col }} disabled={!nbRar[r.id]} title={"Recycler tous les " + r.nom.toLowerCase() + "s non verrouillés"}
+              onClick={() => { vendreRarete(G, r.id); setSel(null); maj(); }}>{r.nom.slice(0, 3)}. ({nbRar[r.id]})</button>
+          ))}</span>
+        </div>
+        <div className="invgrid">
+          {invFiltre.map((it) => (
+            <div key={it.id} className={"icell" + (sel === it.id ? " selrow" : "")}
+              title={it.nom + " · " + RAR_BY_ID[it.rar].nom + " · niv " + it.ilvl + ((it.t || 1) > 1 || (it.a || 0) > 0 ? " · T" + rome(it.t || 1) + " " + (it.a || 0) + "/10" : "") + "\n" + Object.entries(statsEff(it)).map(([k, v]) => "+" + fmt(v) + " " + NOM_ISTAT[k]).join(" · ")}
+              style={{ borderColor: RAR_BY_ID[it.rar].col }}
+              onClick={() => { setSel(sel === it.id ? null : it.id); setCible(null); setSelEq(null); }}
+              onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
+              <Spr id={SLOT_BY_ID[it.slot].ico} scale={3} />
+              {verrou(meta, it) ? <span className="ilock">{estLie(meta, it.id) ? "🔗" : "🔒"}</span> : null}
+              {(it.t || 1) > 1 || (it.a || 0) > 0 ? <span className="itier">T{rome(it.t || 1)}</span> : null}
+            </div>
+          ))}
+          {filtre === "tout" ? Array.from({ length: Math.max(0, 60 - meta.inv.length) }).map((_, i) => <div key={"v" + i} className="icell vide" />) : null}
+        </div>
+      </div>
+      <div className="eqbtns">
+        <button className="eqbtn" title="Ensembles d'équipement" onClick={() => setFenetre("ens")}>🧰<small>E E</small></button>
+        <button className="eqbtn" title="Priorités d'« Équiper le meilleur »" onClick={() => setFenetre("prio")}>🎯<small>PE</small></button>
+        <button className="eqbtn" title="Recyclage automatique" onClick={() => setFenetre("recy")}>♻<small>RA</small></button>
+        <button className="eqbtn" title="Armes de Transcendance" onClick={() => setFenetre("at")}>✦<small>AT</small></button>
+      </div>
+    </div>
+    {fenetre ? (
+      <div className="voile" onClick={() => setFenetre(null)}>
+        <div className="modale large" onClick={(e) => e.stopPropagation()}>
+    {fenetre === "at" ? (
+      <>
+        <div className="mtitre" style={{ color: "#c59bff" }}>ARMES DE TRANSCENDANCE</div>
+        <div className="cinfo dim" style={{ textAlign: "center" }}>uniques · indestructibles · la meilleure s'équipe seule</div>
           <div className="grid2">
             {ZONES.map((z) => {
               const d = ARMES_T[z.id]; if (!d) return null;
@@ -1906,10 +1996,13 @@ function TabEquipement({ G, sel, setSel, maj }) {
               );
             })}
           </div>
-        </div>
-      ) : null}
-      <div className="carte" style={{ marginBottom: 10 }}>
-        <div className="ctitre small">🧰 Ensembles d'équipement <span className="niv">équipe une panoplie en un clic · les pièces liées sont 🔗 verrouillées</span>
+      </>
+    ) : null}
+    {fenetre === "ens" ? (
+      <>
+        <div className="mtitre" style={{ color: "#8be05f" }}>ENSEMBLES D'ÉQUIPEMENT</div>
+        <div className="cinfo togline" style={{ justifyContent: "center" }}>
+          <span className="dim">équipe une panoplie en un clic · pièces liées 🔗 verrouillées</span>
           <button className="btn mini" onClick={() => { sauverEnsemble(G); maj(); }}>+ Sauver l'équipement actuel</button>
           <button className="btn mini ghost" onClick={() => { meta.grpEns.push("Groupe " + (meta.grpEns.length + 1)); G.saveNow = true; maj(); }}>+ Groupe</button>
         </div>
@@ -1942,9 +2035,12 @@ function TabEquipement({ G, sel, setSel, maj }) {
             ))}
           </div>
         ))}
-      </div>
-      <div className="carte" style={{ marginBottom: 10 }}>
-        <div className="ctitre small">🎯 Priorités d'« Équiper le meilleur » <span className="niv">clique pour bâtir l'ordre · vide = équilibre général</span></div>
+      </>
+    ) : null}
+    {fenetre === "prio" ? (
+      <>
+        <div className="mtitre" style={{ color: "#ffd45e" }}>PRIORITÉS D'ÉQUIPEMENT</div>
+        <div className="cinfo dim" style={{ textAlign: "center" }}>clique pour bâtir l'ordre suivi par « ⚡ Équiper le meilleur » · vide = équilibre général</div>
         <div className="cinfo togline">{GRP_STATS.map((g) => {
           const pos = meta.prios.ordres.indexOf(g.id);
           return (
@@ -1972,9 +2068,13 @@ function TabEquipement({ G, sel, setSel, maj }) {
             ) : <button className="btn mini" onClick={() => setEdit({ type: "prof", val: "" })}>💾 Sauver ce profil</button>
           ) : null}
         </div>
-      </div>
-      <div className="carte" style={{ marginBottom: 10 }}>
-        <div className="ctitre small">♻ Recyclage automatique <span className="niv">le butin qui matche est vendu dès qu'il tombe</span>
+      </>
+    ) : null}
+    {fenetre === "recy" ? (
+      <>
+        <div className="mtitre" style={{ color: "#79d0c3" }}>RECYCLAGE AUTOMATIQUE</div>
+        <div className="cinfo togline" style={{ justifyContent: "center" }}>
+          <span className="dim">le butin qui matche est vendu en ⚒ dès qu'il tombe</span>
           <button className={"btn mini" + (recy.on ? " on" : "")} onClick={() => { recy.on = !recy.on; G.saveNow = true; maj(); }}>{recy.on ? "ACTIF" : "INACTIF"}</button>
         </div>
         {recy.on ? (
@@ -1994,70 +2094,13 @@ function TabEquipement({ G, sel, setSel, maj }) {
             </div>
           </>
         ) : null}
-      </div>
-      <div className="invhead">
-        <span>Inventaire <b>{meta.inv.length}</b>/60</span>
-        <button className="btn mini" onClick={() => { trierInventaire(G); maj(); }}>⇅ Tri auto</button>
-        <button className="btn" onClick={() => { equiperMeilleur(G); setSel(null); setCible(null); maj(); }}>⚡ Équiper le meilleur</button>
-        <span className="vendrow">Recycler : {RARS.map((r) => (
-          <button key={r.id} className="btn mini ghost" style={{ borderColor: r.col, color: r.col }} disabled={!nbRar[r.id]}
-            onClick={() => { vendreRarete(G, r.id); setSel(null); maj(); }}>{r.nom}s ({nbRar[r.id]})</button>
-        ))}</span>
-      </div>
-      <div className="invhead">
-        <span className="vendrow">Filtre :
-          <button className={"btn mini" + (filtre === "tout" ? " on" : " ghost")} onClick={() => setFiltre("tout")}>Tout</button>
-          {FAMS.map((f) => (
-            <button key={f.id} className={"btn mini filtrico" + (filtre === f.id ? " on" : " ghost")} title={f.nom} onClick={() => setFiltre(filtre === f.id ? "tout" : f.id)}>
-              <Spr id={FAM_ICO[f.id]} scale={2} /> {f.nom}
-            </button>
-          ))}
-        </span>
-      </div>
-      {selIt ? (
-        <div className="carte detail" style={{ borderColor: RAR_BY_ID[selIt.rar].col }}>
-          <div className="ctitre"><Spr id={SLOT_BY_ID[selIt.slot].ico} scale={2} /> <span style={{ color: RAR_BY_ID[selIt.rar].col }}>{selIt.nom}</span> <span className="niv">{RAR_BY_ID[selIt.rar].nom} · niv {selIt.ilvl}</span></div>
-          {cibles.length > 1 ? (
-            <div className="cinfo togline">Destination : {cibles.map((cid) => (
-              <button key={cid} className={"btn mini" + (slotCible === cid ? " on" : " ghost")} onClick={() => setCible(cid)}>
-                {SLOT_BY_ID[cid].nom}{meta.equip[cid] ? "" : " (vide)"}
-              </button>
-            ))}</div>
-          ) : null}
-          {cles.map((k) => {
-            const a = seSel[k] || 0, b = seEq ? (seEq[k] || 0) : 0, d = a - b;
-            return (
-              <div key={k} className="cinfo statline">
-                <span>{NOM_ISTAT[k]}</span>
-                <span><b>{a > 0 ? "+" + fmt(a) : "—"}</b>{eqSel ? <span className={"diff " + (d > 0 ? "up" : d < 0 ? "down" : "eq")}> {d > 0 ? "▲+" + fmt(d) : d < 0 ? "▼" + fmt(-d) : "="}</span> : null}</span>
-              </div>
-            );
-          })}
-          {eqSel ? <div className="cinfo dim">comparé à : {eqSel.nom} (niv {eqSel.ilvl}) — {SLOT_BY_ID[slotCible].nom}</div> : <div className="cinfo dim">{SLOT_BY_ID[slotCible].nom} : actuellement vide</div>}
-          <AffinageCtrl G={G} it={selIt} maj={maj} />
-          <div className="crow">
-            <button className="btn" onClick={() => { equiper(G, selIt.id, slotCible); setSel(null); setCible(null); maj(); }}>Équiper → {SLOT_BY_ID[slotCible].nom}</button>
-            <button className="btn ghost" disabled={!!selIt.lock} onClick={() => { vendreItem(G, selIt.id); setSel(null); maj(); }}>{selIt.lock ? "🔒 Verrouillé" : "Recycler +" + fmt(prixFerraille(selIt)) + " ⚒"}</button>
-            <button className="btn ghost" onClick={() => { setSel(null); setCible(null); }}>Fermer</button>
-          </div>
+      </>
+    ) : null}
+          <button className="btn" style={{ marginTop: 10 }} onClick={() => setFenetre(null)}>Fermer</button>
         </div>
-      ) : null}
-      {meta.inv.length === 0 ? <p className="note">Rien pour l'instant. Les monstres lâchent leur butin en mourant — 5% sur un monstre, 45% sur un boss de niveau, garanti sur le boss de zone. Astuce : clic droit sur un objet pour le 🔒 verrouiller.</p> : null}
-      <div className="invgrid">
-        {invFiltre.map((it) => (
-          <div key={it.id} className={"icell" + (sel === it.id ? " selrow" : "")}
-            title={it.nom + " · " + RAR_BY_ID[it.rar].nom + " · niv " + it.ilvl + ((it.t || 1) > 1 || (it.a || 0) > 0 ? " · T" + rome(it.t || 1) + " " + (it.a || 0) + "/10" : "") + "\n" + Object.entries(statsEff(it)).map(([k, v]) => "+" + fmt(v) + " " + NOM_ISTAT[k]).join(" · ")}
-            style={{ borderColor: RAR_BY_ID[it.rar].col }}
-            onClick={() => { setSel(sel === it.id ? null : it.id); setCible(null); setSelEq(null); }}
-            onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
-            <Spr id={SLOT_BY_ID[it.slot].ico} scale={3} />
-            {verrou(meta, it) ? <span className="ilock">{estLie(meta, it.id) ? "🔗" : "🔒"}</span> : null}
-            {(it.t || 1) > 1 || (it.a || 0) > 0 ? <span className="itier">T{rome(it.t || 1)}</span> : null}
-          </div>
-        ))}
-        {filtre === "tout" ? Array.from({ length: Math.max(0, 60 - meta.inv.length) }).map((_, i) => <div key={"v" + i} className="icell vide" />) : null}
       </div>
-    </div>
+    ) : null}
+    </>
   );
 }
 
@@ -2440,6 +2483,24 @@ const CSS = `
 .togline{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
 .colonnes.modeEquip{ grid-template-columns:minmax(0,1fr) 340px; }
 .colonnes.modeEquip .zoneDroite{ grid-template-columns:1fr; }
+.colonnes.modeEquip .colG .panneau{ display:flex; flex-direction:column; overflow:hidden; }
+.equipzone{ display:grid; grid-template-columns:minmax(250px,0.95fr) auto minmax(300px,1.25fr) 68px; gap:10px; flex:1; min-height:0; align-items:stretch; }
+.eqpanel{ border:2px solid var(--line); border-radius:12px; background:rgba(0,0,0,.16); padding:8px 10px; display:flex; flex-direction:column; min-height:0; min-width:0; }
+.eqinfo{ overflow-y:auto; }
+.eqdetail{ border-left:3px solid var(--line); padding-left:8px; display:flex; flex-direction:column; gap:4px; }
+.eqdoll{ align-items:center; }
+.eqdoll .doll{ margin-bottom:0; flex:1; align-items:center; }
+.eqinv .invgrid{ overflow-y:auto; flex:1; min-height:0; align-content:start; }
+.eqinv .invhead{ margin:4px 0; }
+.eqbtns{ display:flex; flex-direction:column; gap:8px; }
+.eqbtn{ width:64px; height:64px; border:2px solid var(--line); border-radius:12px; background:var(--panel2); cursor:pointer; color:var(--txt); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:19px; box-shadow:0 3px 0 #0c0f1e; }
+.eqbtn:hover{ border-color:var(--gold); }
+.eqbtn:active{ transform:translateY(2px); box-shadow:none; }
+.eqbtn small{ font-size:9.5px; font-family:'Cinzel', Georgia, serif; letter-spacing:.5px; color:var(--dim); }
+.modale.large{ width:min(880px,94vw); }
+.ctitel2{ font-family:'Cinzel', Georgia, serif; font-size:11.5px; letter-spacing:1.5px; text-transform:uppercase; margin:2px 0 4px; }
+.eqdoll .dollmid{ flex:0 1 210px; padding:10px 14px; }
+.pstats .statcol{ margin-bottom:8px; gap:5px; }
 .doll{ display:flex; gap:14px; justify-content:center; align-items:stretch; margin-bottom:10px; }
 .dollcol{ display:flex; flex-direction:column; gap:6px; }
 .dollmid{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; flex:0 1 340px;
@@ -2581,23 +2642,41 @@ export default function Transcendance() {
         <div className="zoneDroite colcote">
           <div className="panneau pcote pstats">
             <div className="ctitel">Statistiques de combat</div>
+            <div className="ctitel2" style={{ color: "#ff9d5c" }}>Offensives</div>
             <div className="statcol">
               <span className="schip">⚔ ATQ <b>{fmt(st.atk)}</b></span>
-              <span className="schip">♥ PV <b>{fmt(st.hpMax)}</b></span>
-              <span className="schip">⛨ Réduction <b>{Math.round(st.red * 100)}%</b></span>
               <span className="schip">» Vit. attaque <b>{String(Math.round(st.as * 100) / 100).replace(".", ",")}/s</b></span>
               <span className="schip">✳ Critique <b>{Math.round(st.critC)}% ×{String(Math.round(st.critD) / 100).replace(".", ",")}</b></span>
+              <span className="schip">👑 Dégâts boss <b>×{String(Math.round(st.vsBoss * 100) / 100).replace(".", ",")}</b></span>
+            </div>
+            <div className="ctitel2" style={{ color: "#5fc25f" }}>Défensives</div>
+            <div className="statcol">
+              <span className="schip">♥ PV <b>{fmt(st.hpMax)}</b></span>
+              <span className="schip">⛨ Réduction <b>{Math.round(st.red * 100)}%</b></span>
+            </div>
+            <div className="ctitel2" style={{ color: "#ffd45e" }}>Bonus</div>
+            <div className="statcol">
               <span className="schip">◆ Or <b>×{String(Math.round(st.gold * 100) / 100).replace(".", ",")}</b></span>
+              <span className="schip">◎ Remplissage jauges <b>×{String(Math.round(st.gaugeF * 100) / 100).replace(".", ",")}</b></span>
             </div>
-            <div className="ctitel">Stances</div>
-            <div className="chips">
-              {STANCES.map((s) => (
-                <button key={s.id} className={"chip" + (run.stance === s.id ? " on" : "")} style={run.stance === s.id ? { borderColor: s.col, color: s.col } : null}
-                  onClick={() => { run.stance = s.id; sfx("equip", G.meta.opts.sfx); maj(); }}>
-                  {s.ico} {s.nom}
-                </button>
-              ))}
+            <div className="ctitel2" style={{ color: "#c59bff" }}>Divers</div>
+            <div className="statcol">
+              <span className="schip">🏆 Record global <b>niv {G.meta.vie.meilleure}</b></span>
+              <span className="schip">↻ Runs jouées <b>{G.meta.vie.runs}</b></span>
             </div>
+            {tab !== "equip" ? (
+              <>
+                <div className="ctitel">Stances</div>
+                <div className="chips">
+                  {STANCES.map((s) => (
+                    <button key={s.id} className={"chip" + (run.stance === s.id ? " on" : "")} style={run.stance === s.id ? { borderColor: s.col, color: s.col } : null}
+                      onClick={() => { run.stance = s.id; sfx("equip", G.meta.opts.sfx); maj(); }}>
+                      {s.ico} {s.nom}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
           <div className="panneau pcmd" style={tab === "equip" ? { display: "none" } : null}>
             <div className="ctitel">Commandes</div>
