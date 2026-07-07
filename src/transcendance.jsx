@@ -11,8 +11,13 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.8.4";
+const VERSION = "0.8.5";
 const CHANGELOG = [
+  { v: "0.8.5", date: "7 juillet 2026", titre: "Pièces sonnantes & historique", points: [
+    "La bourse affiche de vraies pièces colorées : Cuivre, Argent, Or, Platine, Émeraude, Rubis, Saphir, Diamant — chacune vaut 100 fois la précédente.",
+    "Historique des mises à jour consultable dans Paramètres : tout le changelog depuis le début du jeu.",
+    "Les stances rejoignent la fenêtre Commandes ; le Journal de combat retrouve de la hauteur.",
+  ] },
   { v: "0.8.4", date: "7 juillet 2026", titre: "Fenêtres alignées", points: [
     "Dans l'onglet Équipement, toutes les fenêtres prennent la hauteur de la plus grande, et leur conteneur s'y ajuste exactement.",
   ] },
@@ -150,14 +155,24 @@ function fmt(n) {
   while (n >= 1000 && i < SUF.length - 1) { n /= 1000; i++; }
   return (n >= 100 ? Math.floor(n) : n.toFixed(1).replace(".", ",")) + " " + SUF[i];
 }
-const MON_U = ["c", "a", "o", "p"];
+/* Pi\u00e8ces : chaque type vaut 100 fois le pr\u00e9c\u00e9dent. */
+const PIECES = [
+  { id: "cuivre",   nom: "Cuivre",   u: "c", col: "#b87333" },
+  { id: "argent",   nom: "Argent",   u: "a", col: "#cdd3dd" },
+  { id: "or",       nom: "Or",       u: "o", col: "#ffd45e" },
+  { id: "platine",  nom: "Platine",  u: "p", col: "#9fe3dc" },
+  { id: "emeraude", nom: "\u00c9meraude", u: "e", col: "#3ecf6e" },
+  { id: "rubis",    nom: "Rubis",    u: "r", col: "#ff3b5c" },
+  { id: "saphir",   nom: "Saphir",   u: "s", col: "#4a7dff" },
+  { id: "diamant",  nom: "Diamant",  u: "d", col: "#d8ecff" },
+];
 const MON_SUP = ["", "", "\u00b2", "\u00b3", "\u2074", "\u2075", "\u2076", "\u2077", "\u2078", "\u2079"];
 function fmtM(v) {
   v = Math.floor(Math.max(0, v));
   if (v < 100) return v + "c";
   let mag = 0, x = v;
   while (x >= 100) { x = Math.floor(x / 100); mag++; }
-  const unit = (m) => MON_U[m % 4] + (m >= 4 ? MON_SUP[Math.floor(m / 4) + 1] : "");
+  const unit = (m) => PIECES[m % 8].u + (m >= 8 ? MON_SUP[Math.floor(m / 8) + 1] : "");
   const p = Math.pow(100, mag);
   const top = Math.floor(v / p);
   const rem = Math.floor((v % p) / (p / 100));
@@ -1640,6 +1655,23 @@ function Bar({ v, max, col, h = 14, txt, glow }) {
     </div>
   );
 }
+function Piece({ mag, taille = 15 }) {
+  const c = PIECES[Math.min(mag, PIECES.length - 1)].col;
+  return <i className="piece" title={PIECES[Math.min(mag, PIECES.length - 1)].nom} style={{ width: taille, height: taille, background: "radial-gradient(circle at 34% 28%, rgba(255,255,255,.85), " + c + " 52%, " + c + ")", borderColor: c }} />;
+}
+function Monnaie({ v }) {
+  v = Math.floor(Math.max(0, v));
+  let mag = 0; while (mag < PIECES.length - 1 && v >= Math.pow(100, mag + 1)) mag++;
+  const p = Math.pow(100, mag);
+  const top = Math.floor(v / p);
+  const rem = mag > 0 ? Math.floor((v % p) / (p / 100)) : 0;
+  return (
+    <span className="monnaie" title={top + " " + PIECES[mag].nom + (rem > 0 ? " · " + rem + " " + PIECES[mag - 1].nom : "")}>
+      <b>{top}</b><Piece mag={mag} />
+      {rem > 0 ? <><b>{rem}</b><Piece mag={mag - 1} taille={12} /></> : null}
+    </span>
+  );
+}
 function Pips({ kills }) {
   return (
     <div className="pips">
@@ -2201,12 +2233,13 @@ function ModaleFin({ G, maj }) {
 
 function ModaleNouveautes({ G, fermer }) {
   const notes = CHANGELOG.filter((c) => cmpVer(c.v, G.meta.versionVue) > 0);
-  const liste = notes.length > 0 ? notes : CHANGELOG.slice(0, 1);
+  const histo = notes.length === 0;
+  const liste = histo ? CHANGELOG : notes;
   return (
     <div className="voile" onClick={fermer}>
       <div className="modale" onClick={(e) => e.stopPropagation()}>
-        <div className="mtitre" style={{ color: "#c59bff" }}>NOUVEAUTÉS</div>
-        <div className="cinfo dim">Transcendance v{VERSION}</div>
+        <div className="mtitre" style={{ color: "#c59bff" }}>{histo ? "HISTORIQUE DES MISES À JOUR" : "NOUVEAUTÉS"}</div>
+        <div className="cinfo dim">Transcendance v{VERSION}{histo ? " · " + CHANGELOG.length + " versions depuis le début" : ""}</div>
         {liste.map((c) => (
           <div key={c.v}>
             <div className="msep">v{c.v} · {c.date} — {c.titre}</div>
@@ -2247,7 +2280,7 @@ function ModaleOpts({ G, fermer, maj, voirNotes }) {
     <div className="voile" onClick={fermer}>
       <div className="modale" onClick={(e) => e.stopPropagation()}>
         <div className="mtitre" style={{ color: "#6ad4ff" }}>RÉGLAGES</div>
-        <div className="cinfo">Version <b>v{VERSION}</b> <button className="btn mini ghost" onClick={voirNotes}>Nouveautés</button></div>
+        <div className="cinfo">Version <b>v{VERSION}</b> <button className="btn mini ghost" onClick={voirNotes}>📜 Historique des mises à jour</button></div>
         <div className="cinfo">Vitesse <span className="dim">(mode test — pour valider la boucle sans attendre)</span></div>
         <div className="crow">{[1, 2, 5].map((v) => <button key={v} className={"btn" + (o.vitesse === v ? " on" : "")} onClick={() => { o.vitesse = v; maj(); }}>{v}×</button>)}</div>
         <div className="crow"><button className={"btn" + (o.sfx ? " on" : "")} onClick={() => { o.sfx = !o.sfx; G.saveNow = true; maj(); }}>Sons : {o.sfx ? "OUI" : "NON"}</button></div>
@@ -2487,6 +2520,9 @@ const CSS = `
 .tbgauche .tbside{ font-size:18px; }
 .reschip{ border:2px solid #c9a227; border-radius:9px; padding:2px 11px; background:rgba(0,0,0,.28); box-shadow:inset 0 0 8px rgba(201,162,39,.12); }
 .tbdroite{ display:flex; justify-content:flex-end; }
+.monnaie{ display:inline-flex; align-items:center; gap:6px; }
+.piece{ display:inline-block; border-radius:50%; border:2px solid rgba(0,0,0,.55); box-shadow:0 1px 3px rgba(0,0,0,.6), inset -1px -2px 3px rgba(0,0,0,.35); flex:0 0 auto; }
+.pcmd .chips{ flex-wrap:wrap; overflow:visible; }
 .tbside{ font-size:22px; font-weight:700; display:flex; align-items:center; gap:7px; }
 .tbside .pend{ font-size:18px; margin-left:0; }
 .tbdim{ font-size:16px; color:var(--dim); font-weight:500; }
@@ -2634,7 +2670,7 @@ export default function Transcendance() {
           </span>
           <Pips kills={run.kills} />
         </span>
-        <span className="tbdroite"><span className="tbside reschip gold">◆ {fmtM(run.gold)}</span></span>
+        <span className="tbdroite"><span className="tbside reschip gold"><Monnaie v={run.gold} /></span></span>
       </div>
       <Scene G={G} />
       <div className="tabsbar">
@@ -2678,21 +2714,17 @@ export default function Transcendance() {
               <span className="schip">🏆 Record global <b>niv {G.meta.vie.meilleure}</b></span>
               <span className="schip">↻ Runs jouées <b>{G.meta.vie.runs}</b></span>
             </div>
-            {tab !== "equip" ? (
-              <>
-                <div className="ctitel">Stances</div>
-                <div className="chips">
-                  {STANCES.map((s) => (
-                    <button key={s.id} className={"chip" + (run.stance === s.id ? " on" : "")} style={run.stance === s.id ? { borderColor: s.col, color: s.col } : null}
-                      onClick={() => { run.stance = s.id; sfx("equip", G.meta.opts.sfx); maj(); }}>
-                      {s.ico} {s.nom}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
           </div>
           <div className="panneau pcmd" style={tab === "equip" ? { display: "none" } : null}>
+            <div className="ctitel">Stances</div>
+            <div className="chips" style={{ marginBottom: 12 }}>
+              {STANCES.map((s) => (
+                <button key={s.id} className={"chip" + (run.stance === s.id ? " on" : "")} style={run.stance === s.id ? { borderColor: s.col, color: s.col } : null}
+                  onClick={() => { run.stance = s.id; sfx("equip", G.meta.opts.sfx); maj(); }}>
+                  {s.ico} {s.nom}
+                </button>
+              ))}
+            </div>
             <div className="ctitel">Commandes</div>
             <div className="cmdcol">
               <button className={"btn" + (G.meta.opts.autoRelance ? " on" : "")} title="AFK farm : relance automatiquement une run après la mort" onClick={() => { G.meta.opts.autoRelance = !G.meta.opts.autoRelance; G.saveNow = true; maj(); }}>⟳ AFK {G.meta.opts.autoRelance ? "· ACTIF" : ""}</button>
