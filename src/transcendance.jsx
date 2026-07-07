@@ -11,8 +11,11 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.8.3";
+const VERSION = "0.8.4";
 const CHANGELOG = [
+  { v: "0.8.4", date: "7 juillet 2026", titre: "Fenêtres alignées", points: [
+    "Dans l'onglet Équipement, toutes les fenêtres prennent la hauteur de la plus grande, et leur conteneur s'y ajuste exactement.",
+  ] },
   { v: "0.8.3", date: "7 juillet 2026", titre: "Cadres ajustés & stance affichée", points: [
     "Les cadres de l'onglet Équipement épousent leur contenu — fini les grandes zones vides en bas.",
     "La stance active et son niveau s'affichent sous le personnage, dans un cadre central élargi.",
@@ -2493,10 +2496,10 @@ const CSS = `
 .togline{ display:flex; gap:5px; align-items:center; flex-wrap:wrap; }
 .colonnes.modeEquip{ grid-template-columns:minmax(0,1fr) 340px; }
 .colonnes.modeEquip .zoneDroite{ grid-template-columns:1fr; }
-.colonnes.modeEquip .colG .panneau{ display:flex; flex-direction:column; overflow:hidden; }
-.equipzone{ display:grid; grid-template-columns:minmax(240px,1fr) auto minmax(240px,1fr) 152px; gap:10px; flex:0 0 auto; min-height:0; align-items:start; }
+.colonnes.modeEquip .colG .panneau{ display:flex; flex-direction:column; overflow:hidden; flex:0 0 auto; }
+.equipzone{ display:grid; grid-template-columns:minmax(240px,1fr) auto minmax(240px,1fr) 152px; gap:10px; flex:0 0 auto; min-height:0; align-items:stretch; }
 .eqpanel{ border:2px solid var(--line); border-radius:12px; background:rgba(0,0,0,.16); padding:8px 10px; display:flex; flex-direction:column; min-height:0; min-width:0; }
-.eqinfo{ overflow-y:auto; max-height:60vh; }
+.eqinfo{ overflow-y:auto; }
 .eqdetail{ border-left:3px solid var(--line); padding-left:8px; display:flex; flex-direction:column; gap:4px; }
 .eqdoll{ align-items:center; }
 .eqdoll .doll{ margin-bottom:0; flex:0 0 auto; margin-top:4px; }
