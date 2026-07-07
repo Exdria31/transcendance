@@ -11,8 +11,12 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.5.9";
+const VERSION = "0.6.0";
 const CHANGELOG = [
+  { v: "0.6.0", date: "7 juillet 2026", titre: "Le jeu s'adapte à ton écran", points: [
+    "Mise à l'échelle automatique : le jeu détecte la taille de ta fenêtre et s'ajuste — plus de barres de défilement sur les petits écrans.",
+    "Nouvelle section Graphismes dans les Paramètres : si l'automatique ne te convient pas, force l'échelle à 100 %, 90 %, 80 % ou 70 %, comme dans n'importe quel jeu.",
+  ] },
   { v: "0.5.9", date: "7 juillet 2026", titre: "Notifications élargies", points: [
     "La fenêtre Notifications affiche maintenant 5 lignes.",
     "Le reste de l'interface s'est légèrement resserré pour compenser — toujours zéro défilement, ni sur la page ni sur les jauges.",
@@ -1060,7 +1064,7 @@ function metaInitiale() {
     equip: Object.fromEntries(SLOTS.map((s) => [s.id, null])),
     inv: [],
     vie: { runs: 0, meilleure: 0, kills: 0, or: 0 },
-    opts: { sfx: true, vitesse: 1, autoZone: true, autoRelance: false },
+    opts: { sfx: true, vitesse: 1, autoZone: true, autoRelance: false, echelle: "auto" },
     versionVue: VERSION,
     recy: { on: false, rars: { commun: true, rare: false, epique: false, legendaire: false }, nivMax: 0, fams: { arme: true, anneau: true, boucle: true, amulette: true, armure: true, bottes: true, gants: true } },
     armeTChoix: null,
@@ -1900,6 +1904,12 @@ function ModaleOpts({ G, fermer, maj, voirNotes }) {
         <div className="cinfo">Vitesse <span className="dim">(mode test — pour valider la boucle sans attendre)</span></div>
         <div className="crow">{[1, 2, 5].map((v) => <button key={v} className={"btn" + (o.vitesse === v ? " on" : "")} onClick={() => { o.vitesse = v; maj(); }}>{v}×</button>)}</div>
         <div className="crow"><button className={"btn" + (o.sfx ? " on" : "")} onClick={() => { o.sfx = !o.sfx; G.saveNow = true; maj(); }}>Sons : {o.sfx ? "OUI" : "NON"}</button></div>
+        <div className="msep">GRAPHISMES</div>
+        <div className="cinfo">Échelle de l'interface <span className="dim">(Auto = adaptée à la résolution de ton écran)</span></div>
+        <div className="crow">{["auto", 1, 0.9, 0.8, 0.7].map((v) => (
+          <button key={String(v)} className={"btn" + ((o.echelle || "auto") === v ? " on" : "")}
+            onClick={() => { o.echelle = v; G.saveNow = true; maj(); }}>{v === "auto" ? "AUTO" : Math.round(v * 100) + "%"}</button>
+        ))}</div>
         <div className="msep">SAUVEGARDE</div>
         <div className="crow">
           <button className="btn ghost" onClick={() => setExp(JSON.stringify(versSave(G)))}>Exporter</button>
@@ -2205,8 +2215,13 @@ export default function Transcendance() {
   if (!pret) return <div className="trx"><style>{CSS}</style><div className="charge">CHARGEMENT DE LA FORÊT…</div></div>;
   const G = Gref.current;
   const run = G.run, st = G.st || heroStats(G);
+  /* Échelle : auto = adaptée à la hauteur de la fenêtre (réf. 1240px de design,
+     plancher 72%), sinon valeur forcée dans Paramètres > Graphismes.
+     Recalculée à chaque rendu — le tick 10 Hz suit les redimensionnements. */
+  const echPref = G.meta.opts.echelle || "auto";
+  const zoomV = echPref !== "auto" ? echPref : Math.round(Math.max(0.72, Math.min(1, (typeof window !== "undefined" ? window.innerHeight : 1240) / 1240)) * 1000) / 1000;
   return (
-    <div className="trx">
+    <div className="trx" style={zoomV !== 1 ? { zoom: zoomV, height: "calc(100vh / " + zoomV + ")" } : null}>
       <style>{CSS}</style>
       <div className="entete"><span className="titre">TRANSCENDANCE</span><span className="stitre">idle roguelite — v{VERSION}</span></div>
       <div className="topbar">

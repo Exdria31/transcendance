@@ -1,7 +1,7 @@
 {
   "name": "transcendance",
   "productName": "Transcendance",
-  "version": "0.5.9",
+  "version": "0.6.0",
   "description": "Idle roguelite — die & retry, jauges de transcendance",
   "main": "main.js",
   "scripts": {
