@@ -1,5 +1,8 @@
 # Transcendance — instructions pour Claude Code
 
+> EN DÉBUT DE SESSION : lire `ROADMAP.md` (état du projet, décisions actées,
+> idées écartées, backlog). Le tenir à jour après chaque étape majeure.
+
 ## Projet
 Jeu idle roguelite en un seul fichier React : `src/transcendance.jsx` (~3500 lignes, en français).
 Die & retry avec jauges méta, 15 zones × 10 niveaux (mur brutal dès la zone 5, scaling
