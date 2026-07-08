@@ -11,8 +11,19 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.9.2";
+const VERSION = "0.9.3";
 const CHANGELOG = [
+  { v: "0.9.3", date: "8 juillet 2026", titre: "Game feel & guidance", points: [
+    "Les toasts ont leur couloir dédié en bas à droite : ils ne recouvrent plus jamais l'or, la scène ou l'ennemi — et seuls les vrais événements y apparaissent (butin épique+, Gardien, Renaissance, nodes, Échos, Serments…).",
+    "Le bouton 🔔 s'illumine quand une notification importante attend.",
+    "🎯 Objectifs proches : la colonne droite te suggère en permanence 3-4 prochaines étapes pertinentes (Gardien à vaincre, maîtrise restante, node achetable, Écho à équiper…).",
+    "Bestiaire : le monstre sélectionné a maintenant son panneau de détail dans la colonne droite, avec barre de progression et conseil.",
+    "Loot plus satisfaisant : le nouvel objet clignote doré dans l'inventaire, un ▲ vert signale les améliorations potentielles, badge de rareté sur la fiche.",
+    "Théâtre de combat : l'état pulse quand le boss approche, la scène s'embrase face à un Gardien, les dégâts flottants s'étalent mieux.",
+    "Arbre d'Origine : clique le titre d'une branche pour la mettre en focus (les autres s'estompent), les nodes achetés prennent la couleur de leur branche, connecteurs vers le tronc.",
+    "Renaissance : le gain d'Éclats s'affiche en très grand, façon rituel.",
+    "Info-bulles sur toutes les ressources du bandeau et les stats clés — survole pour comprendre d'où ça vient et à quoi ça sert.",
+  ] },
   { v: "0.9.2", date: "8 juillet 2026", titre: "Confort, échelle & composition", points: [
     "Toute l'interface gagne en échelle : textes, boutons, cartes et valeurs importantes sont plus grands et hiérarchisés — fini de plisser les yeux.",
     "Chaque écran a son titre et son sous-titre ; la colonne droite devient contextuelle : elle affiche des infos utiles selon l'onglet (jauges proches du palier, stance active, progression de zone, état d'Origine…).",
@@ -1400,10 +1411,10 @@ const gAdd = (G, id, v) => {
   G.meta.gauges[id].total += v;
 };
 function addFloat(G, txt, cls, side) {
-  G.floats.push({ id: uid(), txt, cls, side, x: 8 + R() * 44, t: G.now });
+  G.floats.push({ id: uid(), txt, cls, side, x: 6 + R() * 66, t: G.now });
   if (G.floats.length > 24) G.floats.splice(0, G.floats.length - 24);
 }
-function toast(G, txt, col) { G.toasts.push({ id: uid(), txt, col: col || "#f6f2ff", t: G.now }); if (G.toasts.length > 30) G.toasts.shift(); }
+function toast(G, txt, col, imp) { G.toasts.push({ id: uid(), txt, col: col || "#f6f2ff", t: G.now, imp: !!imp }); if (G.toasts.length > 30) G.toasts.shift(); }
 function log(G, txt, col, imp) { if (!G.log) G.log = []; G.log.push({ id: uid(), txt, col: col || "#eef0ff", imp: !!imp }); if (G.log.length > 60) G.log.shift(); }
 
 function rollDrop(G, mon) {
@@ -1425,7 +1436,12 @@ function rollDrop(G, mon) {
   if (meta.inv.length >= 60) {
     const v = gainFerraille(G, prixFerraille(it)); meta.ferraille += v;
     toast(G, "Inventaire plein — " + it.nom + " recyclé +" + fmt(v) + " ⚒", "#b9c2d9");
-  } else { meta.inv.unshift(it); G.dropFlag = true; toast(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); log(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col, RARS.findIndex((r) => r.id === it.rar) >= 4); }
+  } else {
+    meta.inv.unshift(it); G.dropFlag = true; G.lastDrop = { id: it.id, t: G.now };
+    const rareIdx = RARS.findIndex((r) => r.id === it.rar);
+    toast(G, (rareIdx >= 4 ? "★ Butin " + RAR_BY_ID[it.rar].nom.toLowerCase() + " : " : "Butin : ") + it.nom, RAR_BY_ID[it.rar].col, rareIdx >= 4);
+    log(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col, rareIdx >= 4);
+  }
   sfx("equip", meta.opts.sfx);
 }
 /* La vente d'équipement ne rapporte plus d'or : elle produit des morceaux
@@ -1455,7 +1471,7 @@ function tuerMonstre(G) {
   meta.cycle.maxNiv = Math.max(meta.cycle.maxNiv || 1, run.zoneIdx * 10 + run.niveau);
   if (!meta.cycle.renVu && renaissanceDispo(meta)) {
     meta.cycle.renVu = true;
-    toast(G, "☀ RENAISSANCE DISPONIBLE — le cycle peut être dissous (onglet Origine)", "#ffe08a");
+    toast(G, "☀ RENAISSANCE DISPONIBLE — le cycle peut être dissous (onglet Origine)", "#ffe08a", true);
     log(G, "☀ La Renaissance est disponible", "#ffe08a", true);
   }
   const rm = reqMult(meta, mon.def.zone);
@@ -1464,7 +1480,7 @@ function tuerMonstre(G) {
   const apres = tierOf(mon.def, meta.best[mon.def.id], rm);
   if (apres > avant) {
     const zc = ZONE_BY_ID[mon.def.zone].col;
-    toast(G, "Bestiaire ↑ " + mon.def.nom + " — palier " + apres + "/" + mon.def.tiers.length, zc);
+    toast(G, "Bestiaire ↑ " + mon.def.nom + " — palier " + apres + "/" + mon.def.tiers.length, zc, true);
     log(G, "Bestiaire ↑ " + mon.def.nom + " — palier " + apres, zc, true);
     sfx("tier", meta.opts.sfx);
   }
@@ -1484,7 +1500,7 @@ function tuerMonstre(G) {
         while (chanceDouble >= 100) { nEss++; chanceDouble -= 100; }
         if (R() * 100 < chanceDouble) nEss++;
         meta.essence += nEss;
-        toast(G, "✦ Essence résiduelle ×" + nEss + " — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#ff3b5c");
+        toast(G, "✦ Essence résiduelle ×" + nEss + " — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#ff3b5c", true);
         log(G, "✦ +" + nEss + " Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#ff3b5c", true);
         G.saveNow = true;
       }
@@ -1504,7 +1520,7 @@ function tuerMonstre(G) {
       if (run.zoneIdx < ZONES.length - 1 && run.debloque < run.zoneIdx + 1) {
         run.debloque = run.zoneIdx + 1;
         toast(G, ZONES[run.zoneIdx + 1].nom + " débloqué pour cette run !", ZONES[run.zoneIdx + 1].col);
-        log(G, ZONES[run.zoneIdx + 1].nom + " débloqué !", ZONES[run.zoneIdx + 1].col, true);
+        toast(G, "🗺 " + ZONES[run.zoneIdx + 1].nom + " débloqué !", ZONES[run.zoneIdx + 1].col, true); log(G, ZONES[run.zoneIdx + 1].nom + " débloqué !", ZONES[run.zoneIdx + 1].col, true);
       }
       if (meta.opts.autoZone && run.zoneIdx < ZONES.length - 1) {
         run.nivZone[run.zoneIdx] = 10;
@@ -1666,12 +1682,12 @@ function transcender(G, zid) {
   if (!monz.every((m) => estMaitrise(m, meta.best[m.id] || 0, rm))) return;
   meta.zones[zid].trans++;
   monz.forEach((m) => { meta.best[m.id] = 0; });
-  toast(G, ZONE_BY_ID[zid].nom.toUpperCase() + " — TRANSCENDANCE niveau " + meta.zones[zid].trans, "#c59bff");
+  toast(G, ZONE_BY_ID[zid].nom.toUpperCase() + " — TRANSCENDANCE niveau " + meta.zones[zid].trans, "#c59bff", true);
   const ad = ARMES_T[zid];
   if (ad) {
     meta.equip.armeT = armeTEquipee(meta);
     const txt = ad.nom + " " + rome(meta.zones[zid].trans) + (meta.zones[zid].trans > 1 ? " — l'arme se renforce" : " — arme de Transcendance forgée");
-    toast(G, txt, ad.col); log(G, txt, ad.col, true);
+    toast(G, txt, ad.col, true); log(G, txt, ad.col, true);
   }
   sfx("boss", meta.opts.sfx); G.saveNow = true;
 }
@@ -1741,7 +1757,7 @@ function performRenaissance(G) {
   o.echoChoix = generateEchoOptions(meta);
   G.run = runInitiale();
   G.floats = []; G.log = [];
-  toast(G, "☀ RENAISSANCE " + o.ren + " — +" + fmt(calc.total) + " ❖ Éclats d'Origine", "#ffe08a");
+  toast(G, "☀ RENAISSANCE " + o.ren + " — +" + fmt(calc.total) + " ❖ Éclats d'Origine", "#ffe08a", true);
   log(G, "Le monde se reforme. Renaissance n°" + o.ren + " · +" + fmt(calc.total) + " ❖", "#ffe08a", true);
   sfx("boss", meta.opts.sfx);
   G.saveNow = true;
@@ -2061,7 +2077,7 @@ function basculerAlt(G, zid) {
   if (!altsDebloquees(meta) || !ALT_BY_ZONE[zid]) return;
   meta.origine.altSel[zid] = !meta.origine.altSel[zid];
   const a = ALT_BY_ZONE[zid];
-  toast(G, meta.origine.altSel[zid] ? a.nom + " activée — danger et récompenses accrus" : ZONE_BY_ID[zid].nom + " revient à la normale", meta.origine.altSel[zid] ? "#ff6b6b" : "#ccd6f4");
+  toast(G, meta.origine.altSel[zid] ? a.nom + " activée — danger et récompenses accrus" : ZONE_BY_ID[zid].nom + " revient à la normale", meta.origine.altSel[zid] ? "#ff6b6b" : "#ccd6f4", meta.origine.altSel[zid]);
   sfx("equip", meta.opts.sfx); G.saveNow = true;
 }
 const sermentsDebloques = (meta) => bonusOrigine(meta).sermUnlock > 0;
@@ -2075,7 +2091,7 @@ function basculerSerment(G, sid) {
   } else {
     if (o.sermentsActifs.length >= sermentsMax(G.meta)) { toast(G, "Maximum de " + sermentsMax(G.meta) + " Serments actifs", "#ffd45e"); return; }
     o.sermentsActifs.push(sid);
-    toast(G, "⚠ " + SERMENT_BY_ID[sid].nom + " prêté — le cycle sera plus dur, la Renaissance plus riche", "#ff6b6b");
+    toast(G, "⚠ " + SERMENT_BY_ID[sid].nom + " prêté — le cycle sera plus dur, la Renaissance plus riche", "#ff6b6b", true);
   }
   sfx("boss", G.meta.opts.sfx); G.saveNow = true;
 }
@@ -2213,7 +2229,7 @@ function acheterNode(G, nid) {
   if (o.eclats < c) { toast(G, "Pas assez d'Éclats d'Origine (" + c + " ❖)", "#ff6b6b"); return; }
   o.eclats -= c; o.eclatsDep += c;
   o.arbre[nid] = rang + 1;
-  toast(G, "❖ " + n.nom + (n.max > 1 ? " " + (rang + 1) + "/" + n.max : "") + " acquis", "#ffe08a");
+  toast(G, "❖ " + n.nom + (n.max > 1 ? " " + (rang + 1) + "/" + n.max : "") + " acquis", "#ffe08a", true);
   sfx("tier", meta.opts.sfx); G.saveNow = true;
 }
 /* ============================================================
@@ -2297,7 +2313,7 @@ function choisirEcho(G, echoId) {
   o.echos.push(e);
   if (o.echosEq.length < echoSlotsMax(G.meta)) o.echosEq.push(e.id);
   o.echoChoix = null;
-  toast(G, nomEcho(e) + " rejoint ton Origine", RAR_BY_ID[e.rar].col);
+  toast(G, nomEcho(e) + " rejoint ton Origine", RAR_BY_ID[e.rar].col, true);
   sfx("tier", G.meta.opts.sfx); G.saveNow = true;
 }
 function equiperEcho(G, id) {
@@ -2394,7 +2410,7 @@ function Scene({ G }) {
   const bossT = mon && mon.estBoss;
   const monCol = bossT ? (mon.def.type === "zone" ? "#ffd45e" : "#ff4fd8") : "#ffcc33";
   return (
-    <div className="scene">
+    <div className={"scene" + (mon && mon.def.type === "zone" ? " sgardien" : "")}>
       <Fond zi={run.zoneIdx} />
       <div className="lucioles">{[0, 1, 2, 3, 4, 5].map((i) => <i key={i} className="luciole" style={{ left: 6 + i * 16 + "%", animationDelay: i * 1.3 + "s", animationDuration: 7 + (i % 3) * 2 + "s" }} />)}</div>
       <div className="vsband">
@@ -2414,7 +2430,7 @@ function Scene({ G }) {
         else { etat = "EXPLORATION"; col = "#b9c4ea"; }
         return (
           <div className="centreCombat">
-            <div className="etatCombat" style={{ color: col, borderColor: col + "55" }}>{alt ? "🌗 ALTÉRÉE · " : ""}{etat}</div>
+            <div className={"etatCombat" + (run.kills === 9 || (mon && mon.estBoss) ? " urgent" : "")} style={{ color: col, borderColor: col + "55" }}>{alt ? "🌗 ALTÉRÉE · " : ""}{etat}</div>
             {!run.over && !(mon && mon.estBoss) ? <div className="etatSous">{run.kills}/10 avant le boss · niveau {run.niveau}/10</div> : null}
           </div>
         );
@@ -2622,7 +2638,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
         <div className="ctitel">Équipement sélectionné</div>
         {selIt ? (
           <div className="eqdetail" style={{ borderColor: RAR_BY_ID[selIt.rar].col }}>
-            <div className="ctitre"><Spr id={SLOT_BY_ID[selIt.slot].ico} scale={2} /> <span style={{ color: RAR_BY_ID[selIt.rar].col }}>{selIt.nom}</span> <span className="niv">{RAR_BY_ID[selIt.rar].nom} · niv {selIt.ilvl}</span></div>
+            <div className="ctitre"><Spr id={SLOT_BY_ID[selIt.slot].ico} scale={3} /> <span style={{ color: RAR_BY_ID[selIt.rar].col, textShadow: glowRar(selIt.rar) ? "0 0 8px " + RAR_BY_ID[selIt.rar].col + "88" : undefined }}>{selIt.nom}</span> <span className="badge2" style={{ borderColor: RAR_BY_ID[selIt.rar].col, color: RAR_BY_ID[selIt.rar].col }}>{RAR_BY_ID[selIt.rar].nom}</span> <span className="niv">{SLOT_BY_ID[selIt.slot].nom} · niv {selIt.ilvl}</span></div>
             {cibles.length > 1 ? (
               <div className="cinfo togline">Destination : {cibles.map((cid) => (
                 <button key={cid} className={"btn mini" + (slotCible === cid ? " on" : " ghost")} onClick={() => setCible(cid)}>
@@ -2687,7 +2703,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
         <div className="ctitel">Inventaire — {meta.inv.length}/60</div>
         <div className="invhead">
           <button className="btn mini" onClick={() => { trierInventaire(G); maj(); }}>⇅ Tri auto</button>
-          <button className="btn mini" onClick={() => { equiperMeilleur(G); setSel(null); setCible(null); maj(); }}>⚡ Équiper le meilleur</button>
+          <button className="btn" onClick={() => { equiperMeilleur(G); setSel(null); setCible(null); maj(); }}>⚡ Équiper le meilleur</button>
         </div>
         <div className="invhead">
           <span className="vendrow">
@@ -2706,17 +2722,26 @@ function TabEquipement({ G, sel, setSel, maj }) {
           ))}</span>
         </div>
         <div className="invgrid">
-          {invFiltre.map((it) => (
-            <div key={it.id} className={"icell" + (sel === it.id ? " selrow" : "")}
+          {invFiltre.map((it) => {
+            const mieux = (() => {
+              const cs = slotsCibles(it.slot); let pire = Infinity, vide = false;
+              cs.forEach((cid) => { const eq = meta.equip[cid]; if (!eq) vide = true; else pire = Math.min(pire, scoreItem(eq)); });
+              return vide || scoreItem(it) > pire;
+            })();
+            return (
+            <div key={it.id} className={"icell" + (sel === it.id ? " selrow" : "") + (G.lastDrop && G.lastDrop.id === it.id && G.now - G.lastDrop.t < 6000 ? " neuf" : "")}
+              data-mieux={mieux ? 1 : 0}
               title={it.nom + " · " + RAR_BY_ID[it.rar].nom + " · niv " + it.ilvl + ((it.t || 1) > 1 || (it.a || 0) > 0 ? " · T" + rome(it.t || 1) + " " + (it.a || 0) + "/10" : "") + "\n" + Object.entries(statsEff(it)).map(([k, v]) => "+" + fmt(v) + " " + NOM_ISTAT[k]).join(" · ")}
               style={{ borderColor: RAR_BY_ID[it.rar].col, boxShadow: glowRar(it.rar) }}
               onClick={() => { setSel(sel === it.id ? null : it.id); setCible(null); setSelEq(null); }}
               onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
               <Spr id={SLOT_BY_ID[it.slot].ico} scale={4} />
+              {mieux ? <span className="iup" title="Amélioration potentielle">▲</span> : null}
               {verrou(meta, it) ? <span className="ilock">{estLie(meta, it.id) ? "🔗" : "🔒"}</span> : null}
               {(it.t || 1) > 1 || (it.a || 0) > 0 ? <span className="itier">T{rome(it.t || 1)}</span> : null}
             </div>
-          ))}
+            );
+          })}
           {filtre === "tout" ? Array.from({ length: Math.max(0, 60 - meta.inv.length) }).map((_, i) => <div key={"v" + i} className="icell vide" />) : null}
         </div>
       </div>
@@ -2912,7 +2937,7 @@ function TabBestiaire({ G, maj }) {
           const atk = BAL.mob.atk * Math.pow(BAL.mob.atkG, Lm - 1) * m.atkM * (bm ? bm.atk : 1) * zsB.atk;
           const gold = BAL.mob.gold * Math.pow(BAL.mob.goldG, Lm - 1) * m.goldM * (bm ? bm.gold : 1) * zsB.gold;
           return (
-            <div key={m.id} className={"bcard" + (mait ? " bmait" : "") + (est ? " ouverte" : "")} onClick={() => setOuvert(est ? null : m.id)}>
+            <div key={m.id} className={"bcard" + (mait ? " bmait" : "") + (est ? " ouverte" : "")} onClick={() => { setOuvert(est ? null : m.id); G.bestSel = m.id; }}>
               <Spr id={m.spr} scale={est ? 4 : 2} silhouette={!vu} />
               <div className="binfo">
                 <div className="bnom">{vu ? m.nom : "? ? ?"}
@@ -3094,6 +3119,7 @@ function TabOrigine({ G, maj }) {
   const [sub, setSub] = useState("ren");
   const [confirmRen, setConfirmRen] = useState(false);
   const [selNode, setSelNode] = useState(null);
+  const [focusBr, setFocusBr] = useState(null);
   const calc = calcEclats(G);
   const dispo = renaissanceDispo(meta);
   const b = bonusOrigine(meta);
@@ -3128,7 +3154,8 @@ function TabOrigine({ G, maj }) {
             </div>
           </div>
           <div className="carte" style={{ marginTop: 10, borderColor: "#ffe08a" }}>
-            <div className="ctitre small">❖ Gain estimé à la Renaissance : <b style={{ color: "#ffe08a" }}>{fmt(calc.total)}</b> <span className="niv">base {fmt(calc.brut)} × {String(calc.mult).replace(".", ",")}</span></div>
+            <div className="ctitre small">❖ Gain estimé à la Renaissance <span className="niv">base {fmt(calc.brut)} × {String(calc.mult).replace(".", ",")} (Serments & Destin)</span></div>
+            <div className="gainxxl">❖ {fmt(calc.total)}</div>
             <div className="cinfo togline">{calc.det.map(([nom2, v], i) => <span key={i} className="slottag">{nom2} : +{fmt(v)}</span>)}</div>
             <div className="crow">
               <button className="btn big prestige" disabled={!dispo} onClick={() => setConfirmRen(true)}>
@@ -3161,10 +3188,10 @@ function TabOrigine({ G, maj }) {
               </div>
             );
           })() : <div className="cinfo dim" style={{ textAlign: "center", marginBottom: 8 }}>Clique un node pour voir son détail et l'acheter.</div>}
-          <div className="arbre">
+          <div className="arbre" style={focusBr ? { gridTemplateColumns: BRANCHES.map((b2) => (b2.id === focusBr ? "2.4fr" : "0.65fr")).join(" ") } : null}>
             {BRANCHES.map((br) => (
-              <div key={br.id} className="branche">
-                <div className="brtitre" style={{ color: br.col, borderColor: br.col + "44" }}>{br.ico} {br.nom}
+              <div key={br.id} className={"branche" + (focusBr && focusBr !== br.id ? " dimmed" : "")}>
+                <div className="brtitre" title="Clique pour te concentrer sur cette branche" onClick={() => setFocusBr(focusBr === br.id ? null : br.id)} style={{ color: br.col, borderColor: br.col + "44" }}>{br.ico} {br.nom}
                   <div className="brtheme">{br.theme}</div>
                   <div className="brprog">{NODES.filter((n) => n.br === br.id && o.arbre[n.id] > 0).length}/30 nodes · {NODES.filter((n) => n.br === br.id).reduce((a, n) => a + (o.arbre[n.id] || 0), 0)} rangs</div>
                 </div>
@@ -3177,7 +3204,7 @@ function TabOrigine({ G, maj }) {
                     const desc = n.desc.replace("{v}", String(n.val).replace(".", ","));
                     return (
                       <div key={n.id} className={"node" + (n.tier === 3 ? " t3" : "") + (maxed ? " maxed" : reqOk ? (o.eclats >= c ? " dispo" : " cher") : " verrou") + (selNode === n.id ? " selnode" : "")}
-                        style={maxed ? { borderColor: br.col } : null}
+                        style={maxed ? { borderColor: br.col } : rang > 0 ? { borderColor: br.col + "88" } : null}
                         title={desc + (rang > 0 ? " — total actuel : " + String(Math.round(n.val * rang * 100) / 100).replace(".", ",") : "") + (reqOk ? "" : " (node précédent requis)")}
                         onClick={() => setSelNode(selNode === n.id ? null : n.id)}>
                         <span className="nrang">{maxed ? "★" : rang}</span>
@@ -3267,9 +3294,41 @@ function TabOrigine({ G, maj }) {
   );
 }
 
+/* Objectifs proches — pure guidance UX, lit l'état du jeu et suggère 3-4 pistes. */
+function objectifsProches(G) {
+  const meta = G.meta, run = G.run, o = meta.origine, cy = meta.cycle;
+  const obj = [];
+  const zid = ZONES[run.zoneIdx].id, monz = monstresDe(zid), rm = reqMult(meta, zid);
+  const nonMait = monz.filter((m) => !estMaitrise(m, meta.best[m.id] || 0, rm)).length;
+  if (o.echoChoix) obj.push(["🌀", "Choisis ton Écho (Origine → Échos)"]);
+  if (renaissanceDispo(meta)) obj.push(["☀", "Renaissance disponible — dissous le cycle quand tu es prêt"]);
+  else if ((cy.maxZone || 0) >= 3) obj.push(["☀", "Atteins la zone 5 pour débloquer la Renaissance (" + ((cy.maxZone || 0) + 1) + "/5)"]);
+  else if ((cy.maxZone || 0) >= 1) obj.push(["🗺", "Atteins la zone 4 pour découvrir l'Origine"]);
+  if (!cy.gardiens[zid]) obj.push(["⚔", "Vaincs le Gardien — " + ZONE_BY_ID[zid].nom + " niveau 10"]);
+  else if (nonMait > 0) obj.push(["📖", "Maîtrise encore " + nonMait + " monstre" + (nonMait > 1 ? "s" : "") + " en " + ZONE_BY_ID[zid].nom]);
+  else obj.push(["✦", "Transcende " + ZONE_BY_ID[zid].nom + " (Bestiaire)"]);
+  if (o.ren >= 1) {
+    const dispoNode = NODES.some((n) => { const r = o.arbre[n.id] || 0; return r < n.max && (!n.req || o.arbre[n.req] > 0) && o.eclats >= coutNode(n, r); });
+    if (dispoNode) obj.push(["🌳", "Un node de l'Arbre d'Origine est achetable (❖ " + fmt(o.eclats) + ")"]);
+    if (o.echosEq.length < echoSlotsMax(meta) && o.echos.some((e) => !o.echosEq.includes(e.id))) obj.push(["🌀", "Un slot d'Écho est libre — équipe un Écho"]);
+  }
+  const stn = meta.stances[run.stance];
+  if (stn && meta.tokens >= nivCost(stn.niv)) obj.push(["🥋", "Améliore ta stance (⬡ " + nivCost(stn.niv) + " dispo)"]);
+  if (meta.inv.length >= 50) obj.push(["♻", "Inventaire presque plein — recycle (" + meta.inv.length + "/60)"]);
+  return obj.slice(0, 4);
+}
+
 /* Panneau contextuel de la colonne droite (change selon l'onglet actif). */
 function ContexteRail({ G, tab }) {
   const meta = G.meta, run = G.run;
+  const objs = objectifsProches(G);
+  const blocObj = (
+    <>
+      <div className="ctitel">🎯 Objectifs proches</div>
+      {objs.map((ob, i) => <div key={i} className="objrow"><span>{ob[0]}</span><span>{ob[1]}</span></div>)}
+      <div style={{ height: 8 }} />
+    </>
+  );
   if (tab === "boutique") {
     const proches = GAUGES.map((g) => {
       const gs = meta.gauges[g.id];
@@ -3279,6 +3338,7 @@ function ContexteRail({ G, tab }) {
     }).sort((a, b) => b.p - a.p).slice(0, 3);
     const pend = GAUGES.reduce((a, g) => a + Math.max(0, tiersFromTotal(g, meta.gauges[g.id].total) - meta.gauges[g.id].applied), 0);
     return (<>
+      {blocObj}
       <div className="ctitel">Contexte · Boutique</div>
       {proches.map(({ g, p }) => <div key={g.id} className="ctxrow"><span style={{ color: g.col }}>{g.ico} {g.nom}</span><b>{Math.round(p * 100)}% du palier</b></div>)}
       <div className="ctxrow"><span>Paliers en attente</span><b style={pend > 0 ? { color: "#ffd45e" } : null}>{pend}</b></div>
@@ -3288,6 +3348,7 @@ function ContexteRail({ G, tab }) {
   if (tab === "stances") {
     const sd = STANCE_BY_ID[run.stance], stn = meta.stances[sd.id];
     return (<>
+      {blocObj}
       <div className="ctitel">Contexte · Stance</div>
       <div className="ctxrow"><span style={{ color: sd.col }}>{sd.ico} {sd.nom}</span><b>{stn ? "niv " + stn.niv + " · évo " + stn.evo : "fixe"}</b></div>
       {stn ? <div className="ctxrow"><span>Prochain niveau</span><b>⬡ {nivCost(stn.niv)} <span className="dim">({meta.tokens} dispo)</span></b></div> : null}
@@ -3297,17 +3358,38 @@ function ContexteRail({ G, tab }) {
   if (tab === "best") {
     const zid = ZONES[run.zoneIdx].id, monz = monstresDe(zid), rm = reqMult(meta, zid);
     const mait = monz.filter((m) => estMaitrise(m, meta.best[m.id] || 0, rm)).length;
+    const selM = (G.bestSel && MON_BY_ID[G.bestSel]) || monz.find((m) => !estMaitrise(m, meta.best[m.id] || 0, rm)) || monz[0];
+    const rmS = selM ? reqMult(meta, selM.zone) : 1;
+    const kS = selM ? (meta.best[selM.id] || 0) : 0;
+    const tS = selM ? tierOf(selM, kS, rmS) : 0;
+    const maitS = selM ? tS >= selM.tiers.length : false;
+    const seuilS = selM && !maitS ? Math.ceil(selM.tiers[tS] * rmS) : 0;
     return (<>
+      {blocObj}
       <div className="ctitel">Contexte · {ZONE_BY_ID[zid].nom}</div>
       <div className="ctxrow"><span>Maîtrise de zone</span><b style={mait === monz.length ? { color: "#8be05f" } : null}>{mait}/{monz.length}</b></div>
       <div className="ctxrow"><span>Gardien</span><b>{meta.cycle.gardiens[zid] ? "vaincu ✓" : "à vaincre"}</b></div>
       <div className="ctxrow"><span>Transcendance</span><b>{meta.zones[zid].trans}</b></div>
       <div className="ctxrow"><span>Or de maîtrise global</span><b style={{ color: "#ffd45e" }}>+{bestGoldBonus(meta)}%</b></div>
+      {selM ? (
+        <div className="bdet">
+          <Spr id={selM.spr} scale={4} silhouette={kS === 0} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="bnom">{kS > 0 ? selM.nom : "? ? ?"}
+              {selM.type === "zone" ? <span className="badge2" style={{ borderColor: "#ffd45e", color: "#ffd45e" }}>Gardien</span> : selM.type === "mini" ? <span className="badge2" style={{ borderColor: "#c59bff", color: "#c59bff" }}>Mini-boss</span> : null}
+            </div>
+            <div className="cinfo dim">{fmt(kS)} kills · {maitS ? "maîtrisé ★" : "palier " + tS + "/" + selM.tiers.length}</div>
+            {!maitS ? <Bar v={kS} max={seuilS} col={ZONE_BY_ID[selM.zone].col} h={12} txt={fmt(kS) + " / " + fmt(seuilS)} /> : null}
+            <div className="cinfo dim" style={{ marginTop: 4 }}>{maitS ? "Déjà maîtrisé — vise la Transcendance de la zone." : seuilS - kS <= Math.max(3, seuilS * 0.1) ? "⚡ Tout proche du prochain palier !" : "+" + (BAL.bestDmg * (tS + 1)) + "% dégâts au prochain palier."}</div>
+          </div>
+        </div>
+      ) : null}
     </>);
   }
   if (tab === "origine") {
     const o = meta.origine, calc = calcEclats(G);
     return (<>
+      {blocObj}
       <div className="ctitel">Contexte · Origine</div>
       <div className="ctxrow"><span>❖ Éclats</span><b style={{ color: "#ffe08a" }}>{fmt(o.eclats)}</b></div>
       <div className="ctxrow"><span>Gain estimé</span><b>+{fmt(calc.total)} <span className="dim">×{String(calc.mult).replace(".", ",")}</span></b></div>
@@ -3759,6 +3841,28 @@ const CSS = `
 /* zones altérées : ambiance corrompue */
 .carteAlt{ background:linear-gradient(180deg, rgba(38,24,66,.85), rgba(16,10,34,.9)) !important; }
 .zoneDroite{ grid-template-rows:auto auto minmax(0,1fr); }
+
+/* ============================================================
+   v0.9.3 — GAME FEEL : toast lane, théâtre, loot, arbre, guidance
+   ============================================================ */
+.toastsFlot{ top:auto; bottom:62px; right:16px; flex-direction:column; justify-content:flex-end; }
+.toastsFlot .toast{ animation:toastSlide .22s ease-out; }
+@keyframes toastSlide{ from{ transform:translateX(26px); opacity:0; } to{ transform:none; opacity:1; } }
+.notifbtn.alerte{ border-color:var(--gold); color:var(--gold); box-shadow:0 0 10px rgba(255,212,94,.35); }
+.etatCombat.urgent{ animation:pulse 1.1s infinite; }
+.scene.sgardien{ box-shadow:var(--ombre), inset 0 0 46px rgba(255,212,94,.16); }
+.icell{ transition:outline-color .15s; }
+.icell.neuf{ animation:neufGlow 1.1s ease-in-out infinite; }
+@keyframes neufGlow{ 0%,100%{ outline:2px solid rgba(255,224,138,.12); } 50%{ outline:2px solid rgba(255,224,138,.85); } }
+.iup{ position:absolute; top:-1px; left:3px; color:#8be05f; font-size:13px; font-weight:900; text-shadow:0 0 4px #000, 0 0 8px rgba(139,224,95,.6); }
+.objrow{ display:flex; gap:7px; align-items:flex-start; font-size:13.5px; padding:3px 0; line-height:1.3; }
+.arbretronc{ margin-bottom:14px; }
+.brtitre{ cursor:pointer; position:relative; transition:opacity .15s; }
+.brtitre::before{ content:""; position:absolute; top:-13px; left:50%; width:2px; height:12px; background:linear-gradient(#c9a227aa, transparent); }
+.branche.dimmed{ opacity:.38; filter:saturate(.5); }
+.gainxxl{ font-family:'Cinzel', Georgia, serif; font-size:40px; line-height:1.1; color:#ffe08a; text-align:center; text-shadow:0 0 20px rgba(255,224,138,.55), 2px 2px 0 #000; letter-spacing:2px; }
+.bdet{ display:flex; gap:10px; align-items:flex-start; margin-top:8px; border-top:1px dashed #2c3358; padding-top:8px; }
+.eqdetail .ctitre{ font-size:18px; }
 `;
 
 /* Accès de test headless (Node) — aucun effet en jeu. */
@@ -3837,10 +3941,10 @@ export default function Transcendance() {
       <div className="entete"><span className="titre">TRANSCENDANCE</span><span className="stitre">idle roguelite — v{VERSION}</span></div>
       <div className="topbar">
         <span className="tbgauche">
-          <span className="tbside reschip tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
-          <span className="tbside reschip" style={{ color: "#b9c2d9" }}>⚒ {fmt(G.meta.ferraille)} <span className="tbdim">ferraille</span></span>
-          <span className="tbside reschip" style={{ color: "#ff3b5c" }}>✦ {G.meta.essence} <span className="tbdim">essence{G.meta.essence > 1 ? "s" : ""} résiduelle{G.meta.essence > 1 ? "s" : ""}</span></span>
-          {renaissanceVisible(G.meta) ? <span className="tbside reschip" style={{ color: "#ffe08a" }}>❖ {fmt(G.meta.origine.eclats)} <span className="tbdim">éclats</span></span> : null}
+          <span className="tbside reschip tokc" title="Tokens de boss : gagnés en battant boss et Gardiens. Servent à monter les stances.">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
+          <span className="tbside reschip" style={{ color: "#b9c2d9" }} title="Ferraille : obtenue en recyclant l'équipement. Sert à affiner les pièces (+5% de stats par niveau).">⚒ {fmt(G.meta.ferraille)} <span className="tbdim">ferraille</span></span>
+          <span className="tbside reschip" style={{ color: "#ff3b5c" }} title="Essence résiduelle : lâchée par le Gardien de chaque zone, une fois par run. Fait évoluer le Tier d'un équipement.">✦ {G.meta.essence} <span className="tbdim">essence{G.meta.essence > 1 ? "s" : ""} résiduelle{G.meta.essence > 1 ? "s" : ""}</span></span>
+          {renaissanceVisible(G.meta) ? <span className="tbside reschip" style={{ color: "#ffe08a" }} title="Éclats d'Origine : monnaie permanente gagnée à la Renaissance. Achète les nodes de l'Arbre d'Origine.">❖ {fmt(G.meta.origine.eclats)} <span className="tbdim">éclats</span></span> : null}
         </span>
         <span className="tbcentre">
           <span className="zlabel">
@@ -3850,7 +3954,7 @@ export default function Transcendance() {
           </span>
           <Pips kills={run.kills} />
         </span>
-        <span className="tbdroite"><span className="tbside reschip gold"><Monnaie v={run.gold} /></span></span>
+        <span className="tbdroite"><span className="tbside reschip gold" title="Or de la run : dépensé en Boutique. L'or restant nourrit la jauge Fortune en fin de run."><Monnaie v={run.gold} /></span></span>
       </div>
       <Scene G={G} />
       <div className="tabsbar">
@@ -3888,7 +3992,7 @@ export default function Transcendance() {
               <span className="schip">⚔ ATQ <b>{fmt(st.atk)}</b></span>
               <span className="schip">» Vit. attaque <b>{String(Math.round(st.as * 100) / 100).replace(".", ",")}/s</b></span>
               <span className="schip">✳ Critique <b>{Math.round(st.critC)}% ×{String(Math.round(st.critD) / 100).replace(".", ",")}</b></span>
-              <span className="schip">👑 Dégâts boss <b>×{String(Math.round(st.vsBoss * 100) / 100).replace(".", ",")}</b></span>
+              <span className="schip" title="Multiplicateur de dégâts contre les boss et Gardiens (jauge Domination, équipement, stances).">👑 Dégâts boss <b>×{String(Math.round(st.vsBoss * 100) / 100).replace(".", ",")}</b></span>
             </div>
             <div className="ctitel2" style={{ color: "#5fc25f" }}>Défensives</div>
             <div className="statcol">
@@ -3898,7 +4002,7 @@ export default function Transcendance() {
             <div className="ctitel2" style={{ color: "#ffd45e" }}>Bonus</div>
             <div className="statcol">
               <span className="schip">◆ Or <b>×{String(Math.round(st.gold * 100) / 100).replace(".", ",")}</b></span>
-              <span className="schip">◎ Remplissage jauges <b>×{String(Math.round(st.gaugeF * 100) / 100).replace(".", ",")}</b></span>
+              <span className="schip" title="Vitesse de remplissage de toutes les jauges méta (équipement, Arbre d'Origine, Échos).">◎ Remplissage jauges <b>×{String(Math.round(st.gaugeF * 100) / 100).replace(".", ",")}</b></span>
             </div>
             <div className="ctitel2" style={{ color: "#c59bff" }}>Divers</div>
             <div className="statcol">
@@ -3947,10 +4051,13 @@ export default function Transcendance() {
           </div>
         </div>
       </div>
-      <div className="toastsFlot">
-        {G.toasts.filter((t) => G.now - t.t < 4200).slice(-3).map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
-      </div>
-      <button className="btn mini notifbtn" onClick={() => { const dernier = G.toasts.length ? G.toasts[G.toasts.length - 1].id : 0; setTiroir(!tiroir); setNotifVu(dernier); }}>
+      {!tiroir ? (
+        <div className="toastsFlot">
+          {G.toasts.filter((t) => t.imp && G.now - t.t < 4200).slice(-3).map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
+        </div>
+      ) : null}
+      <button className={"btn mini notifbtn" + (!tiroir && G.toasts.some((t) => t.imp && t.id > notifVu) ? " alerte" : "")}
+        onClick={() => { const dernier = G.toasts.length ? G.toasts[G.toasts.length - 1].id : 0; setTiroir(!tiroir); setNotifVu(dernier); }}>
         🔔 Notifications{(() => { const n = G.toasts.filter((t) => t.id > notifVu).length; return n > 0 && !tiroir ? " (" + n + ")" : ""; })()}
       </button>
       {tiroir ? (
