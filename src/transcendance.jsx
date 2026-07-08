@@ -11,8 +11,19 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.9.0";
+const VERSION = "0.9.1";
 const CHANGELOG = [
+  { v: "0.9.1", date: "8 juillet 2026", titre: "Grande toilette de l'interface", points: [
+    "Design harmonisé partout : bordures fines, panneaux en profondeur, plus d'air, hiérarchie claire — fini l'effet « outil de debug ».",
+    "Scène de combat : badge du type d'ennemi (normal / mini-boss / Gardien), état en direct (exploration, boss imminent, AFK, zone altérée), critiques spectaculaires.",
+    "Journal de combat filtrable : par défaut, seuls les événements importants s'affichent ; le spam de combat reste accessible via « Tout ». Notifications repliables.",
+    "Bestiaire entièrement repensé : cartes compactes scannables, filtres par zone / statut / type, détail complet au clic — le lore ne gêne plus la lecture.",
+    "Origine plus prestigieuse : bouton de Renaissance doré et pulsant, toast quand elle devient disponible, arbre aux nodes épurés (détail au survol), progression par branche, nodes majeurs mis en valeur.",
+    "Serments : badge de risque (faible → extrême) et durée clarifiée. Zones altérées : badge dédié.",
+    "Les raretés Légendaire, Mythique et Divin rayonnent d'un halo lumineux sur l'équipement et les Échos.",
+    "Stances : grande carte de la stance active avec tous ses effets ; chaque stance affiche sa couleur d'identité.",
+    "Correction : la Vitalité affiche désormais le vrai pourcentage de soin (30%).",
+  ] },
   { v: "0.9.0", date: "8 juillet 2026", titre: "L'Origine — le monde s'agrandit", points: [
     "Le continent passe à 15 zones : Montagne, Plaines Orageuses, Glacier, Volcan, Marais Putride, Ruines Anciennes, Citadelle Astrale, Jungle Primordiale, Abysses, Désert de Verre, Ciel Fragmenté et le Cœur du Monde — chacune avec ses 11 créatures, son Gardien et son arme de Transcendance.",
     "Attention : à partir de la zone 5, le monde devient brutal. C'est voulu.",
@@ -1015,6 +1026,8 @@ function genItem(slotId, ilvl, forceRar) {
    stats de base × (1 + 5% par niveau d'affinage cumulé sur les tiers) :
    Tier I aff.10 = ×1,5 · Tier II aff.10 = ×2 · Tier III aff.10 = ×2,5. */
 const multAff = (it) => 1 + 0.05 * ((it.a || 0) + 10 * ((it.t || 1) - 1));
+/* Halo lumineux des hautes raretés (Légendaire et au-delà). */
+const glowRar = (rarId) => { const i = RARS.findIndex((r) => r.id === rarId); return i >= 5 ? "0 0 " + (5 + (i - 4) * 4) + "px " + RAR_BY_ID[rarId].col + "55" : undefined; };
 function statsEff(it) { const m = multAff(it); if (m === 1) return it.stats; const o = {}; for (const k in it.stats) o[k] = Math.round(it.stats[k] * m); return o; }
 const coutAffinage = (it) => Math.max(1, Math.round(it.ilvl * RAR_BY_ID[it.rar].mult * (it.t || 1) * (1 + 0.3 * (it.a || 0))));
 function trouverItem(meta, id) {
@@ -1382,7 +1395,7 @@ function addFloat(G, txt, cls, side) {
   if (G.floats.length > 24) G.floats.splice(0, G.floats.length - 24);
 }
 function toast(G, txt, col) { G.toasts.push({ id: uid(), txt, col: col || "#f6f2ff", t: G.now }); if (G.toasts.length > 30) G.toasts.shift(); }
-function log(G, txt, col) { if (!G.log) G.log = []; G.log.push({ id: uid(), txt, col: col || "#eef0ff" }); if (G.log.length > 30) G.log.shift(); }
+function log(G, txt, col, imp) { if (!G.log) G.log = []; G.log.push({ id: uid(), txt, col: col || "#eef0ff", imp: !!imp }); if (G.log.length > 60) G.log.shift(); }
 
 function rollDrop(G, mon) {
   const meta = G.meta;
@@ -1403,7 +1416,7 @@ function rollDrop(G, mon) {
   if (meta.inv.length >= 60) {
     const v = gainFerraille(G, prixFerraille(it)); meta.ferraille += v;
     toast(G, "Inventaire plein — " + it.nom + " recyclé +" + fmt(v) + " ⚒", "#b9c2d9");
-  } else { meta.inv.unshift(it); G.dropFlag = true; toast(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); log(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); }
+  } else { meta.inv.unshift(it); G.dropFlag = true; toast(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); log(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col, RARS.findIndex((r) => r.id === it.rar) >= 4); }
   sfx("equip", meta.opts.sfx);
 }
 /* La vente d'équipement ne rapporte plus d'or : elle produit des morceaux
@@ -1424,13 +1437,18 @@ function tuerMonstre(G) {
   run.hp = st.hpMax;
   run.gold += g; run.stats.or += g; meta.vie.or += g;
   addFloat(G, "+" + fmtM(g), "gold", "mon");
-  log(G, mon.def.nom + " vaincu · +" + fmtM(g), "#ffd45e");
+  log(G, mon.def.nom + " vaincu · +" + fmtM(g), "#ffd45e", mon.estBoss);
   sfx("coin", meta.opts.sfx);
   gAdd(G, "extermination", 1 * st.gaugeF);
   run.stats.kills++; meta.vie.kills++;
   meta.cycle.kills = (meta.cycle.kills || 0) + 1;
   meta.cycle.maxZone = Math.max(meta.cycle.maxZone || 0, run.zoneIdx);
   meta.cycle.maxNiv = Math.max(meta.cycle.maxNiv || 1, run.zoneIdx * 10 + run.niveau);
+  if (!meta.cycle.renVu && renaissanceDispo(meta)) {
+    meta.cycle.renVu = true;
+    toast(G, "☀ RENAISSANCE DISPONIBLE — le cycle peut être dissous (onglet Origine)", "#ffe08a");
+    log(G, "☀ La Renaissance est disponible", "#ffe08a", true);
+  }
   const rm = reqMult(meta, mon.def.zone);
   const avant = tierOf(mon.def, meta.best[mon.def.id] || 0, rm);
   meta.best[mon.def.id] = (meta.best[mon.def.id] || 0) + 1;
@@ -1438,14 +1456,14 @@ function tuerMonstre(G) {
   if (apres > avant) {
     const zc = ZONE_BY_ID[mon.def.zone].col;
     toast(G, "Bestiaire ↑ " + mon.def.nom + " — palier " + apres + "/" + mon.def.tiers.length, zc);
-    log(G, "Bestiaire ↑ " + mon.def.nom + " — palier " + apres, zc);
+    log(G, "Bestiaire ↑ " + mon.def.nom + " — palier " + apres, zc, true);
     sfx("tier", meta.opts.sfx);
   }
   if (mon.estBoss) {
     run.tokensPend++; gAdd(G, "domination", 1 * st.gaugeF);
-    if (R() * 100 < (oB.tokensB || 0)) { run.tokensPend++; log(G, "Trophée royal — token de boss bonus ⬡", "#c59bff"); }
+    if (R() * 100 < (oB.tokensB || 0)) { run.tokensPend++; log(G, "Trophée royal — token de boss bonus ⬡", "#c59bff", true); }
     addFloat(G, "+1 ⬡", "token", "mon");
-    log(G, "+1 token de boss ⬡", "#c59bff");
+    log(G, "+1 token de boss ⬡", "#c59bff", true);
     if (mon.def.type === "zone") {
       const zidB = mon.def.zone;
       meta.cycle.gardiens[zidB] = Math.max(meta.cycle.gardiens[zidB] || 0, altActive(meta, zidB) ? 2 : 1);
@@ -1458,7 +1476,7 @@ function tuerMonstre(G) {
         if (R() * 100 < chanceDouble) nEss++;
         meta.essence += nEss;
         toast(G, "✦ Essence résiduelle ×" + nEss + " — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#ff3b5c");
-        log(G, "✦ +" + nEss + " Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#ff3b5c");
+        log(G, "✦ +" + nEss + " Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#ff3b5c", true);
         G.saveNow = true;
       }
     }
@@ -1477,7 +1495,7 @@ function tuerMonstre(G) {
       if (run.zoneIdx < ZONES.length - 1 && run.debloque < run.zoneIdx + 1) {
         run.debloque = run.zoneIdx + 1;
         toast(G, ZONES[run.zoneIdx + 1].nom + " débloqué pour cette run !", ZONES[run.zoneIdx + 1].col);
-        log(G, ZONES[run.zoneIdx + 1].nom + " débloqué !", ZONES[run.zoneIdx + 1].col);
+        log(G, ZONES[run.zoneIdx + 1].nom + " débloqué !", ZONES[run.zoneIdx + 1].col, true);
       }
       if (meta.opts.autoZone && run.zoneIdx < ZONES.length - 1) {
         run.nivZone[run.zoneIdx] = 10;
@@ -1510,7 +1528,7 @@ function finRun(G, morte) {
   meta.vie.meilleure = Math.max(meta.vie.meilleure, run.zoneIdx * 10 + run.niveau);
   run.overT = G.now;
   run.gains = { paliers, tokens: run.tokensPend, fortuneOr: orRestant };
-  log(G, morte ? "Défaite — jauges et or restant actés" : "Run encaissée — jauges et or restant actés", "#8be05f");
+  log(G, morte ? "Défaite — jauges et or restant actés" : "Run encaissée — jauges et or restant actés", "#8be05f", true);
   sfx(morte ? "mort" : "tier", meta.opts.sfx);
   G.saveNow = true;
 }
@@ -1644,7 +1662,7 @@ function transcender(G, zid) {
   if (ad) {
     meta.equip.armeT = armeTEquipee(meta);
     const txt = ad.nom + " " + rome(meta.zones[zid].trans) + (meta.zones[zid].trans > 1 ? " — l'arme se renforce" : " — arme de Transcendance forgée");
-    toast(G, txt, ad.col); log(G, txt, ad.col);
+    toast(G, txt, ad.col); log(G, txt, ad.col, true);
   }
   sfx("boss", meta.opts.sfx); G.saveNow = true;
 }
@@ -1715,7 +1733,7 @@ function performRenaissance(G) {
   G.run = runInitiale();
   G.floats = []; G.log = [];
   toast(G, "☀ RENAISSANCE " + o.ren + " — +" + fmt(calc.total) + " ❖ Éclats d'Origine", "#ffe08a");
-  log(G, "Le monde se reforme. Renaissance n°" + o.ren + " · +" + fmt(calc.total) + " ❖", "#ffe08a");
+  log(G, "Le monde se reforme. Renaissance n°" + o.ren + " · +" + fmt(calc.total) + " ❖", "#ffe08a", true);
   sfx("boss", meta.opts.sfx);
   G.saveNow = true;
 }
@@ -2370,7 +2388,23 @@ function Scene({ G }) {
     <div className="scene">
       <Fond zi={run.zoneIdx} />
       <div className="lucioles">{[0, 1, 2, 3, 4, 5].map((i) => <i key={i} className="luciole" style={{ left: 6 + i * 16 + "%", animationDelay: i * 1.3 + "s", animationDuration: 7 + (i % 3) * 2 + "s" }} />)}</div>
-      <div className="vsband"><span className="g">Héros</span><span className="vsm">VS</span><span className="g">{mon ? (vu ? mon.def.nom : "? ? ?") : "…"}</span></div>
+      <div className="vsband">
+        <span className="g">Héros</span>
+        <span className="vsm">VS</span>
+        <span className="g">{mon ? (vu ? mon.def.nom : "? ? ?") : "…"}{mon ? <span className="badge2" style={{ marginLeft: 8, borderColor: monCol, color: monCol }}>{bossT ? (mon.def.type === "zone" ? "GARDIEN" : "MINI-BOSS") : "normal"}</span> : null}</span>
+      </div>
+      {(() => {
+        const zid = ZONES[run.zoneIdx].id;
+        const alt = altActive(G.meta, zid);
+        let etat, col;
+        if (run.over) { etat = "CYCLE EN PAUSE"; col = "#ff6b6b"; }
+        else if (mon && mon.def.type === "zone") { etat = "⚔ GARDIEN DE ZONE"; col = "#ffd45e"; }
+        else if (mon && mon.estBoss) { etat = "☠ MINI-BOSS"; col = "#ff4fd8"; }
+        else if (run.kills === 9) { etat = "☠ BOSS IMMINENT"; col = "#ff9d5c"; }
+        else if (G.meta.opts.autoRelance) { etat = "EXPLORATION · AFK"; col = "#8be05f"; }
+        else { etat = "EXPLORATION"; col = "#b9c4ea"; }
+        return <div className="etatCombat" style={{ color: col, borderColor: col + "55" }}>{alt ? "🌗 ALTÉRÉE · " : ""}{etat}</div>;
+      })()}
       <div className="combattant hero">
         <div className="floats">{G.floats.filter((f) => f.side === "hero").map((f) => <span key={f.id} className={"float " + f.cls} style={{ left: f.x + "%" }}>{f.txt}</span>)}</div>
         <div className={"sprwrap bob" + (heroLunge ? " lunge" : "") + (heroHurt ? " flash" : "")}><Spr id="hero" scale={5} flip /></div>
@@ -2415,7 +2449,7 @@ function TabBoutique({ G, maj }) {
       <div className="grid2">
         {[
           { k: "atk", nom: "Entraînement d'attaque", lvl: run.lvlAtk, cout: cA, eff: "+5% ATQ / niveau", cur: "+" + run.lvlAtk * BAL.shop.atkV + "% ATQ", col: "#ff9d5c", ico: "⚔" },
-          { k: "hp", nom: "Vitalité", lvl: run.lvlHp, cout: cH, eff: "+5% PV max / niveau · soigne 25% à l'achat", cur: "+" + run.lvlHp * BAL.shop.hpV + "% PV", col: "#5fc25f", ico: "♥" },
+          { k: "hp", nom: "Vitalité", lvl: run.lvlHp, cout: cH, eff: "+5% PV max / niveau · soigne " + Math.round(BAL.shop.heal * 100) + "% à l'achat", cur: "+" + run.lvlHp * BAL.shop.hpV + "% PV", col: "#5fc25f", ico: "♥" },
         ].map((c) => (
           <div key={c.k} className="carte">
             <div className="ctitre"><span style={{ color: c.col }}>{c.ico}</span> {c.nom} <span className="niv">niv {c.lvl}</span></div>
@@ -2466,6 +2500,19 @@ function TabStances({ G, maj }) {
     <div>
       <div className="tokrow"><span className="tok">⬡ {meta.tokens}</span> tokens de boss{run.tokensPend > 0 ? <span className="pend"> +{run.tokensPend} crédités en fin de run</span> : null}</div>
       <p className="note">Le bonus <b>principal</b> monte niveau par niveau (tokens). Tous les 5 niveaux, une <b>évolution</b> améliore toutes les sous-stats — jamais le principal.</p>
+      {(() => {
+        const sd = STANCE_BY_ID[run.stance]; const sv = stanceVals(sd, meta.stances[sd.id]); const stn = meta.stances[sd.id];
+        return (
+          <div className="carte" style={{ borderColor: sd.col, marginBottom: 10, boxShadow: "0 0 14px " + sd.col + "2e" }}>
+            <div className="ctitre"><span style={{ color: sd.col, fontSize: 20 }}>{sd.ico}</span> <b style={{ color: sd.col }}>{sd.nom}</b> <span className="badge2" style={{ borderColor: sd.col, color: sd.col }}>Stance active</span> <span className="niv">{stn ? "niv " + stn.niv + " · évo " + stn.evo : "stance fixe"}</span></div>
+            <div className="cinfo dim">{sd.desc}</div>
+            <div className="togline" style={{ marginTop: 3 }}>
+              {sd.principal ? <span className="schip" style={{ color: sd.col }}>{pct(sv.principal)} {NOM_STAT[sd.principal.stat]}</span> : <span className="schip dim">Aucun modificateur</span>}
+              {sv.subs.map((s, i) => <span key={i} className="schip" style={{ color: s.val >= 0 ? "#8be05f" : "#ff6b6b" }}>{pct(s.val)} {NOM_STAT[s.stat]}</span>)}
+            </div>
+          </div>
+        );
+      })()}
       <div className="grid2">
         {STANCES.map((sd) => {
           const st = meta.stances[sd.id];
@@ -2474,7 +2521,7 @@ function TabStances({ G, maj }) {
           const cout = st ? nivCost(st.niv) : 0;
           const evoDispo = st ? Math.floor(st.niv / 5) > st.evo : false;
           return (
-            <div key={sd.id} className={"carte stance" + (active ? " active" : "")} style={{ borderColor: active ? sd.col : undefined }}>
+            <div key={sd.id} className={"carte stance" + (active ? " active" : "")} style={{ borderColor: active ? sd.col : sd.col + "3a" }}>
               <div className="ctitre"><span style={{ color: sd.col }}>{sd.ico}</span> {sd.nom} {st ? <span className="niv">niv {st.niv} · évo {st.evo}</span> : <span className="niv">fixe</span>}</div>
               <div className="cinfo dim">{sd.desc}</div>
               {sd.principal ? (
@@ -2542,7 +2589,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
     return (
       <div key={s.id} className={"dcase" + (locked ? " locked" : "") + (selEq === s.id ? " selrow" : "")}
         title={locked ? "Transcende une zone pour déverrouiller" : it ? it.nom + " · " + RAR_BY_ID[it.rar].nom + " · niv " + it.ilvl : s.nom + " (vide)"}
-        style={it ? { borderColor: RAR_BY_ID[it.rar].col } : null}
+        style={it ? { borderColor: RAR_BY_ID[it.rar].col, boxShadow: glowRar(it.rar) } : null}
         onClick={() => { if (it) { setSelEq(selEq === s.id ? null : s.id); setSel(null); } }}
         onContextMenu={(e) => { e.preventDefault(); if (it) { basculerLock(G, it.id); maj(); } }}>
         <Spr id={s.ico} scale={4} silhouette={!it} />
@@ -2592,7 +2639,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
             <div className="crow"><button className="btn ghost" onClick={() => setSelEq(null)}>Fermer</button></div>
           </div>
         ) : (
-          <div className="cinfo dim" style={{ marginTop: 10 }}>Sélectionne une pièce d'équipement — dans l'inventaire à droite ou sur le personnage au centre — pour voir ses détails, la comparer, l'affiner et l'équiper.<br /><br />Astuce : clic droit = 🔒 verrouiller/déverrouiller.</div>
+          <div className="videtat" style={{ marginTop: 8 }}>🛡<br />Sélectionne une pièce — dans l'inventaire ou sur le personnage — pour la comparer, l'affiner et l'équiper.<br /><span className="dim" style={{ fontSize: 13 }}>Astuce : clic droit = 🔒 verrouiller · survol = stats</span></div>
         )}
       </div>
       <div className="eqpanel eqdoll">
@@ -2633,7 +2680,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
           {invFiltre.map((it) => (
             <div key={it.id} className={"icell" + (sel === it.id ? " selrow" : "")}
               title={it.nom + " · " + RAR_BY_ID[it.rar].nom + " · niv " + it.ilvl + ((it.t || 1) > 1 || (it.a || 0) > 0 ? " · T" + rome(it.t || 1) + " " + (it.a || 0) + "/10" : "") + "\n" + Object.entries(statsEff(it)).map(([k, v]) => "+" + fmt(v) + " " + NOM_ISTAT[k]).join(" · ")}
-              style={{ borderColor: RAR_BY_ID[it.rar].col }}
+              style={{ borderColor: RAR_BY_ID[it.rar].col, boxShadow: glowRar(it.rar) }}
               onClick={() => { setSel(sel === it.id ? null : it.id); setCible(null); setSelEq(null); }}
               onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
               <Spr id={SLOT_BY_ID[it.slot].ico} scale={3} />
@@ -2784,54 +2831,89 @@ function TabEquipement({ G, sel, setSel, maj }) {
 
 function TabBestiaire({ G, maj }) {
   const meta = G.meta;
+  const [bz, setBz] = useState(null); /* null = zone courante */
+  const [bst, setBst] = useState("tous");
+  const [btype, setBtype] = useState("tous");
+  const [ouvert, setOuvert] = useState(null);
+  const zid = bz || ZONES[G.run.zoneIdx].id;
+  const z = ZONE_BY_ID[zid];
+  const zi = ZONES.findIndex((x) => x.id === zid);
+  const monz = monstresDe(zid);
+  const rm = reqMult(meta, zid);
+  const maitres = monz.filter((m) => estMaitrise(m, meta.best[m.id] || 0, rm)).length;
+  const tous = maitres === monz.length;
+  const trans = meta.zones[zid].trans;
+  const liste = monz.filter((m) => {
+    const mait = estMaitrise(m, meta.best[m.id] || 0, rm);
+    if (bst === "mait" && !mait) return false;
+    if (bst === "cours" && mait) return false;
+    if (btype === "normal" && m.type !== "normal") return false;
+    if (btype === "boss" && m.type === "normal") return false;
+    return true;
+  });
   return (
     <div>
-      <p className="note">Bonus d'or de maîtrise global : <b style={{ color: "#ffd45e" }}>+{bestGoldBonus(meta)}%</b>. Chaque palier de connaissance donne +{BAL.bestDmg}% infligés / −{BAL.bestRes}% subis contre le monstre. Transcender une zone remet ses connaissances à zéro (seuils ×2,5) mais double ses bonus de maîtrise — et débloque l'Arme de Transcendance.</p>
-      {ZONES.map((z, zi) => {
-        const monz = monstresDe(z.id);
-        const rm = reqMult(meta, z.id);
-        const maitres = monz.filter((m) => estMaitrise(m, meta.best[m.id] || 0, rm)).length;
-        const tous = maitres === monz.length;
-        const trans = meta.zones[z.id].trans;
-        return (
-          <div key={z.id} style={{ marginBottom: 16 }}>
-            <div className="carte" style={{ marginBottom: 10, borderColor: z.col }}>
-              <div className="ctitre"><span style={{ color: z.col }}>✦</span> {z.nom} <span className="niv">maîtrise {maitres}/{monz.length} · transcendance {trans}{rm > 1 ? " · seuils ×" + String(rm).replace(".", ",") : ""}</span></div>
-              <div className="crow"><button className="btn evo" disabled={!tous} onClick={() => { transcender(G, z.id); maj(); }}>TRANSCENDER — {z.nom}</button></div>
-            </div>
-            <div className="grid2">
-              {monz.map((m) => {
-                const kills = meta.best[m.id] || 0, t = tierOf(m, kills, rm), vu = kills > 0;
-                const seuils = m.tiers.map((x) => Math.ceil(x * rm));
-                const Lm = zi * 10 + (zi === G.run.zoneIdx ? G.run.niveau : 1);
-                const bm = m.type === "zone" ? BAL.zbos : m.type === "mini" ? BAL.boss : null;
-                const zsB = zScale(zi);
-                const hp = BAL.mob.hp * Math.pow(BAL.mob.hpG, Lm - 1) * m.hpM * (bm ? bm.hp : 1) * zsB.hp;
-                const atk = BAL.mob.atk * Math.pow(BAL.mob.atkG, Lm - 1) * m.atkM * (bm ? bm.atk : 1) * zsB.atk;
-                const gold = BAL.mob.gold * Math.pow(BAL.mob.goldG, Lm - 1) * m.goldM * (bm ? bm.gold : 1) * zsB.gold;
-                return (
-                  <div key={m.id} className="carte bestc">
-                    <div className="bestrow">
-                      <Spr id={m.spr} scale={3} silhouette={!vu} />
-                      <div style={{ flex: 1 }}>
-                        <div className="ctitre small">{vu ? m.nom : "? ? ?"}{m.type !== "normal" ? <span className="badge" style={{ color: m.type === "zone" ? "#ffd45e" : "#c59bff" }}>{m.type === "zone" ? "GARDIEN" : "BOSS"}</span> : null}</div>
-                        <div className="tierpips">{[0, 1, 2, 3, 4].map((i) => <span key={i} className={"tp" + (i < t ? " on" : "")} />)}</div>
-                        <div className="cinfo dim">{fmt(kills)} kill{kills > 1 ? "s" : ""}{t < 5 ? " · palier suivant : " + fmt(seuils[t]) : " · MAÎTRISÉ ★"}</div>
-                      </div>
+      <p className="note">Bonus d'or de maîtrise global : <b style={{ color: "#ffd45e" }}>+{bestGoldBonus(meta)}%</b> · chaque palier : +{BAL.bestDmg}% infligés / −{BAL.bestRes}% subis contre le monstre. Clique une carte pour tout son détail.</p>
+      <div className="bfiltres">
+        {ZONES.slice(0, Math.max(G.run.debloque + 1, (meta.cycle && meta.cycle.maxZone || 0) + 1)).map((zz) => (
+          <button key={zz.id} className={"btn mini" + (zid === zz.id ? " on" : " ghost")} style={zid === zz.id ? { borderColor: zz.col, color: zz.col } : null} onClick={() => { setBz(zz.id); setOuvert(null); }}>{zz.nom}</button>
+        ))}
+      </div>
+      <div className="bfiltres">
+        {[["tous", "Tous"], ["cours", "En cours"], ["mait", "Maîtrisés ★"]].map(([id, nom]) => (
+          <button key={id} className={"btn mini" + (bst === id ? " on" : " ghost")} onClick={() => setBst(id)}>{nom}</button>
+        ))}
+        <span className="dim" style={{ margin: "0 4px" }}>·</span>
+        {[["tous", "Tout type"], ["normal", "Normaux"], ["boss", "Boss & Gardien"]].map(([id, nom]) => (
+          <button key={id} className={"btn mini" + (btype === id ? " on" : " ghost")} onClick={() => setBtype(id)}>{nom}</button>
+        ))}
+        <span style={{ marginLeft: "auto" }} className="cinfo dim">maîtrise <b style={{ color: z.col }}>{maitres}/{monz.length}</b>{trans > 0 ? " · transcendance " + trans : ""}{rm > 1 ? " · seuils ×" + String(Math.round(rm * 100) / 100).replace(".", ",") : ""}</span>
+        <button className="btn mini evo" disabled={!tous} onClick={() => { transcender(G, zid); maj(); }}>TRANSCENDER</button>
+      </div>
+      <div className="bgrid">
+        {liste.map((m) => {
+          const kills = meta.best[m.id] || 0, t = tierOf(m, kills, rm), vu = kills > 0;
+          const mait = t >= m.tiers.length;
+          const seuils = m.tiers.map((x) => Math.ceil(x * rm));
+          const est = ouvert === m.id;
+          const Lm = zi * 10 + (zi === G.run.zoneIdx ? G.run.niveau : 1);
+          const bm = m.type === "zone" ? BAL.zbos : m.type === "mini" ? BAL.boss : null;
+          const zsB = zScale(zi);
+          const hp = BAL.mob.hp * Math.pow(BAL.mob.hpG, Lm - 1) * m.hpM * (bm ? bm.hp : 1) * zsB.hp;
+          const atk = BAL.mob.atk * Math.pow(BAL.mob.atkG, Lm - 1) * m.atkM * (bm ? bm.atk : 1) * zsB.atk;
+          const gold = BAL.mob.gold * Math.pow(BAL.mob.goldG, Lm - 1) * m.goldM * (bm ? bm.gold : 1) * zsB.gold;
+          return (
+            <div key={m.id} className={"bcard" + (mait ? " bmait" : "") + (est ? " ouverte" : "")} onClick={() => setOuvert(est ? null : m.id)}>
+              <Spr id={m.spr} scale={est ? 4 : 2} silhouette={!vu} />
+              <div className="binfo">
+                <div className="bnom">{vu ? m.nom : "? ? ?"}
+                  {m.type === "zone" ? <span className="badge2" style={{ borderColor: "#ffd45e", color: "#ffd45e" }}>Gardien</span> : null}
+                  {m.type === "mini" ? <span className="badge2" style={{ borderColor: "#c59bff", color: "#c59bff" }}>Mini-boss</span> : null}
+                  {mait ? <span style={{ color: "#ffd45e" }}>★</span> : null}
+                </div>
+                <div className="tierpips">{m.tiers.map((_, i) => <span key={i} className={"tp" + (i < t ? " on" : "")} />)}</div>
+                <div className="bsous">
+                  <span>{fmt(kills)} kill{kills > 1 ? "s" : ""}</span>
+                  {!mait ? <span>prochain palier : <b>{fmt(seuils[t])}</b></span> : <span style={{ color: "#8be05f" }}>maîtrisé</span>}
+                  {t >= 1 ? <span style={{ color: z.col }}>+{BAL.bestDmg * t}% dmg</span> : null}
+                </div>
+                {est ? (
+                  <div style={{ marginTop: 6 }}>
+                    <div className="cinfo dim it">{vu ? m.desc : "Terrasse-le une première fois pour l'identifier."}</div>
+                    <div className="bsous" style={{ marginTop: 4 }}>
+                      {t >= 2 ? <span>PV (niv {Lm}) : <b>{fmt(hp)}</b></span> : <span className="dim">PV : palier 2</span>}
+                      {t >= 3 ? <span>ATQ : <b>{fmt(atk)}</b> · <b>{String(Math.round(BAL.mob.as * m.asM * (bm ? bm.as : 1) * 100) / 100).replace(".", ",")}</b>/s</span> : <span className="dim">ATQ : palier 3</span>}
+                      {t >= 4 ? <span>Or : <b style={{ color: "#ffd45e" }}>{fmtM(gold)}</b></span> : <span className="dim">Or : palier 4</span>}
                     </div>
-                    {vu ? <div className="cinfo dim it">{m.desc}</div> : <div className="cinfo dim it">Terrasse-le une première fois pour l'identifier.</div>}
-                    {t >= 1 ? <div className="cinfo" style={{ color: z.col }}>+{BAL.bestDmg * t}% infligés · −{BAL.bestRes * t}% subis</div> : null}
-                    {t >= 2 ? <div className="cinfo">PV <span className="dim">(niveau {Lm})</span> : <b>{fmt(hp)}</b></div> : null}
-                    {t >= 3 ? <div className="cinfo">ATQ : <b>{fmt(atk)}</b> · cadence <b>{String(Math.round(BAL.mob.as * m.asM * (bm ? bm.as : 1) * 100) / 100).replace(".", ",")}</b>/s</div> : null}
-                    {t >= 4 ? <div className="cinfo">Or : <b style={{ color: "#ffd45e" }}>{fmtM(gold)}</b></div> : null}
-                    {t >= 5 ? <div className="cinfo" style={{ color: "#ffd45e" }}>★ Maîtrisé — +{BAL.bestGold * Math.pow(2, trans)}% or global</div> : null}
+                    <div className="cinfo dim" style={{ marginTop: 4 }}>Paliers : {seuils.map((s, i) => <span key={i} style={{ color: i < t ? "#8be05f" : undefined }}>{fmt(s)}{i < seuils.length - 1 ? " · " : ""}</span>)}</div>
+                    {mait ? <div className="cinfo" style={{ color: "#ffd45e" }}>★ Maîtrisé — +{BAL.bestGold * Math.pow(2, trans)}% or global</div> : null}
                   </div>
-                );
-              })}
+                ) : null}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2960,7 +3042,7 @@ function EchoCard({ G, e, maj, mode }) {
   const o = G.meta.origine;
   const t = ECHO_TYPE_BY_ID[e.type], rc = RAR_BY_ID[e.rar];
   return (
-    <div className="carte echocard" style={{ borderColor: rc.col }}>
+    <div className="carte echocard" style={{ borderColor: rc.col, boxShadow: glowRar(e.rar) }}>
       <div className="ctitre small"><span style={{ color: t.col }}>{t.ico}</span> <span style={{ color: rc.col }}>{nomEcho(e)}</span> <span className="niv">{rc.nom} · niv {e.niv}</span></div>
       {e.effets.map((ef, i) => (
         <div key={i} className="cinfo" style={{ color: ef.v < 0 ? "#ff6b6b" : "#8be05f" }}>{ef.v > 0 ? "+" : ""}{String(ef.v).replace(".", ",")} {ECHO_LIB[ef.e] || ef.e}</div>
@@ -3019,7 +3101,7 @@ function TabOrigine({ G, maj }) {
             <div className="ctitre small">❖ Gain estimé à la Renaissance : <b style={{ color: "#ffe08a" }}>{fmt(calc.total)}</b> <span className="niv">base {fmt(calc.brut)} × {String(calc.mult).replace(".", ",")}</span></div>
             <div className="cinfo togline">{calc.det.map(([nom2, v], i) => <span key={i} className="slottag">{nom2} : +{fmt(v)}</span>)}</div>
             <div className="crow">
-              <button className="btn big" style={{ borderColor: "#ffe08a", color: "#ffe08a" }} disabled={!dispo} onClick={() => setConfirmRen(true)}>
+              <button className="btn big prestige" disabled={!dispo} onClick={() => setConfirmRen(true)}>
                 {dispo ? "☀ RENAÎTRE" : "☀ RENAÎTRE — atteins la zone 5 pour débloquer (" + (cy.maxZone + 1) + "/5)"}
               </button>
             </div>
@@ -3033,7 +3115,10 @@ function TabOrigine({ G, maj }) {
           <div className="arbre">
             {BRANCHES.map((br) => (
               <div key={br.id} className="branche">
-                <div className="brtitre" style={{ color: br.col }}>{br.ico} {br.nom}<div className="brtheme">{br.theme}</div></div>
+                <div className="brtitre" style={{ color: br.col, borderColor: br.col + "44" }}>{br.ico} {br.nom}
+                  <div className="brtheme">{br.theme}</div>
+                  <div className="brprog">{NODES.filter((n) => n.br === br.id && o.arbre[n.id] > 0).length}/30 nodes · {NODES.filter((n) => n.br === br.id).reduce((a, n) => a + (o.arbre[n.id] || 0), 0)} rangs</div>
+                </div>
                 <div className="brnodes" style={{ borderColor: br.col }}>
                   {NODES.filter((n) => n.br === br.id).map((n) => {
                     const rang = o.arbre[n.id] || 0;
@@ -3042,7 +3127,7 @@ function TabOrigine({ G, maj }) {
                     const c = coutNode(n, rang);
                     const desc = n.desc.replace("{v}", String(n.val).replace(".", ","));
                     return (
-                      <div key={n.id} className={"node" + (maxed ? " maxed" : reqOk ? (o.eclats >= c ? " dispo" : " cher") : " verrou")}
+                      <div key={n.id} className={"node" + (n.tier === 3 ? " t3" : "") + (maxed ? " maxed" : reqOk ? (o.eclats >= c ? " dispo" : " cher") : " verrou")}
                         style={maxed ? { borderColor: br.col } : null}
                         title={desc + (rang > 0 ? " — total actuel : " + String(Math.round(n.val * rang * 100) / 100).replace(".", ",") : "") + (reqOk ? "" : " (node précédent requis)")}
                         onClick={() => { if (reqOk && !maxed) { acheterNode(G, n.id); maj(); } }}>
@@ -3076,14 +3161,15 @@ function TabOrigine({ G, maj }) {
 
       {sub === "serments" ? (
         <div>
-          <p className="note">Les <b>Serments</b> durcissent le cycle en échange d'un multiplicateur d'Éclats à la Renaissance{sermentsDebloques(meta) ? "" : " — débloque-les via le node « Serment scellé » de la branche Destin"}. Actifs : <b>{(o.sermentsActifs || []).length}/{sermentsMax(meta)}</b> · Multiplicateur total : <b style={{ color: "#ffe08a" }}>×{String(calc.mult).replace(".", ",")}</b></p>
+          <p className="note">Les <b>Serments</b> durcissent le cycle <b>en cours</b> (malus immédiats, jusqu'à la prochaine Renaissance) en échange d'un multiplicateur d'Éclats{sermentsDebloques(meta) ? "" : " — débloque-les via le node « Serment scellé » de la branche Destin"}. Actifs : <b>{(o.sermentsActifs || []).length}/{sermentsMax(meta)}</b> · Multiplicateur total : <b style={{ color: "#ffe08a" }}>×{String(calc.mult).replace(".", ",")}</b></p>
           <div className="grid2">
             {SERMENTS.map((s) => {
               const actif = (o.sermentsActifs || []).includes(s.id);
               const locked = !sermentsDebloques(meta);
+              const risque = s.eclatsM >= 1.45 ? ["EXTRÊME", "#ff4fd8"] : s.eclatsM >= 1.3 ? ["ÉLEVÉ", "#ff6b6b"] : s.eclatsM >= 1.2 ? ["MOYEN", "#ff9d5c"] : ["FAIBLE", "#8be05f"];
               return (
                 <div key={s.id} className="carte" style={{ borderColor: actif ? "#ff6b6b" : undefined, opacity: locked ? 0.5 : 1 }}>
-                  <div className="ctitre small">{s.ico} {s.nom} <span className="niv">×{String(s.eclatsM).replace(".", ",")} Éclats{s.echoRar ? " · Échos plus rares" : ""}</span></div>
+                  <div className="ctitre small">{s.ico} {s.nom} <span className="badge2" style={{ borderColor: risque[1], color: risque[1] }}>{risque[0]}</span> <span className="niv">×{String(s.eclatsM).replace(".", ",")} Éclats{s.echoRar ? " · Échos plus rares" : ""}</span></div>
                   <div className="cinfo dim">{s.desc}</div>
                   <div className="crow"><button className={"btn" + (actif ? " danger" : "")} disabled={locked} onClick={() => { basculerSerment(G, s.id); maj(); }}>{locked ? "🔒 Verrouillé" : actif ? "ROMPRE" : "PRÊTER SERMENT"}</button></div>
                 </div>
@@ -3102,7 +3188,7 @@ function TabOrigine({ G, maj }) {
               const locked = !altsDebloquees(meta);
               return (
                 <div key={a.id} className="carte" style={{ borderColor: actif ? ZONE_BY_ID[a.zoneId].col : undefined, opacity: locked ? 0.5 : 1 }}>
-                  <div className="ctitre small" style={{ color: ZONE_BY_ID[a.zoneId].col }}>🌗 {a.nom} <span className="niv">{ZONE_BY_ID[a.zoneId].nom}</span></div>
+                  <div className="ctitre small" style={{ color: ZONE_BY_ID[a.zoneId].col }}>🌗 {a.nom} <span className="badge2" style={{ borderColor: "#7a6aff", color: "#9a8aff" }}>Altérée</span> <span className="niv">{ZONE_BY_ID[a.zoneId].nom}</span></div>
                   <div className="cinfo dim">{a.desc}</div>
                   <div className="cinfo" style={{ color: "#ff6b6b" }}>PV ×{String(a.mob.hp).replace(".", ",")} · ATQ ×{String(a.mob.atk).replace(".", ",")}{a.mob.as !== 1 ? " · Vitesse ×" + String(a.mob.as).replace(".", ",") : ""}{a.mob.bossHp ? " · PV boss ×" + String(a.mob.bossHp).replace(".", ",") : ""}</div>
                   <div className="cinfo" style={{ color: "#8be05f" }}>Or ×{String(a.rew.gold).replace(".", ",")}{a.rew.essence ? " · essence ×2" : ""}{a.rew.ferraille ? " · +" + a.rew.ferraille + "% ferraille" : ""}{a.rew.echoRar ? " · Échos plus rares" : ""}</div>
@@ -3123,7 +3209,7 @@ function TabOrigine({ G, maj }) {
             <div className="cinfo dim">Run et or · progression et déblocage des zones · bestiaire et maîtrises · Transcendances et armes de Transcendance · jauges méta{b.gardeJauges > 0 ? " (" + Math.min(50, b.gardeJauges) + "% conservés)" : ""} · niveaux de stances · équipement, inventaire, ensembles · ferraille et essence résiduelle</div>
             <div className="msep" style={{ color: "#8be05f" }}>SERA CONSERVÉ</div>
             <div className="cinfo dim">Éclats d'Origine · Arbre d'Origine · Échos · Serments débloqués · Zones altérées · statistiques lifetime · réglages, recyclage, priorités</div>
-            <button className="btn big" style={{ borderColor: "#ffe08a", color: "#ffe08a" }} onClick={() => { performRenaissance(G); setConfirmRen(false); setSub("echos"); maj(); }}>☀ RENAÎTRE MAINTENANT</button>
+            <button className="btn big prestige" onClick={() => { performRenaissance(G); setConfirmRen(false); setSub("echos"); maj(); }}>☀ RENAÎTRE MAINTENANT</button>
             <button className="btn ghost" onClick={() => setConfirmRen(false)}>Pas encore</button>
           </div>
         </div>
@@ -3424,6 +3510,84 @@ const CSS = `
 .zarrow{ background:var(--panel2); border:2px solid var(--line); border-radius:8px; color:var(--txt); width:26px; height:24px; cursor:pointer; font-size:10px; padding:0; margin:0 4px; vertical-align:middle; }
 .zarrow:disabled{ opacity:.3; cursor:default; }
 .btn.mini{ padding:4px 7px; font-size:10px; text-transform:none; }
+
+/* ============================================================
+   v0.9.1 — DESIGN SYSTEM (couche d'harmonisation)
+   Bordures fines, air, profondeur, hiérarchie, états, feedbacks.
+   ============================================================ */
+.trx{ --line:#2f3760; --panel:#1c2340; --panel2:#232a4c; --dim:#b9c4ea; --r1:8px; --r2:12px; --r3:16px; --ombre:0 4px 14px rgba(0,0,0,.35); }
+.panneau{ border-width:1px; border-color:#2c3358; border-radius:var(--r3); padding:12px 14px;
+  background:linear-gradient(180deg, rgba(35,42,76,.55), rgba(22,27,46,.88)); box-shadow:var(--ombre); }
+.carte{ border-width:1px; border-color:#323a68; border-radius:var(--r2); padding:10px 12px; gap:4px;
+  background:linear-gradient(180deg, rgba(38,45,77,.85), rgba(30,36,64,.85)); transition:border-color .15s; }
+.carte:hover{ border-color:#414b85; }
+.topbar{ border-width:1px; border-radius:var(--r3); box-shadow:var(--ombre); padding:7px 14px; }
+.tabsbar{ border-width:1px; border-radius:var(--r3); }
+.tabbtn{ padding:9px 4px; transition:color .15s, background .15s; }
+.tabbtn:hover{ color:var(--txt); background:rgba(255,255,255,.035); }
+.eqpanel,.dcase,.icell,.node,.slot,.jauge{ border-width:1px; }
+.reschip{ border-width:1px; border-color:#9c7f2c; border-radius:999px; padding:3px 15px; box-shadow:inset 0 0 10px rgba(201,162,39,.10), 0 2px 6px rgba(0,0,0,.3); }
+.btn{ border-width:1px; border-radius:var(--r1); background:linear-gradient(180deg, #2a3157, #1f2540); transition:border-color .12s, box-shadow .12s; }
+.btn:not(:disabled):hover{ border-color:#5a64a0; }
+.btn.on:not(:disabled):hover{ border-color:var(--leaf); }
+.btn.ghost{ background:transparent; }
+.btn.big{ border-radius:var(--r2); }
+.btn.prestige{ font-family:'Cinzel', Georgia, serif; border:1px solid #d4af37; color:#241a04; font-weight:700;
+  background:linear-gradient(180deg, #ffe9a8, #d4af37); text-shadow:none; letter-spacing:2px;
+  box-shadow:0 0 18px rgba(255,224,138,.35), 0 3px 0 #7a5c14; animation:glowPulse 2.2s ease-in-out infinite; }
+.btn.prestige:not(:disabled):hover{ border-color:#fff0c0; }
+.btn.prestige:disabled{ animation:none; background:linear-gradient(180deg, #4a4436, #37331f); color:#9a916d; border-color:#5a5230; box-shadow:none; opacity:1; }
+.bar{ border-radius:6px; border-width:1px; }
+.barfill{ border-radius:5px; }
+.ctitel{ border-bottom-color:#2c3358; }
+.ctitre{ font-size:15px; }
+.niv{ font-size:12px; }
+.badge2{ font-family:'Cinzel', Georgia, serif; font-size:10px; letter-spacing:1px; border:1px solid; border-radius:5px; padding:1px 7px; text-transform:uppercase; white-space:nowrap; }
+.scene{ border-width:1px; border-color:#3a4270; box-shadow:var(--ombre), inset 0 -18px 30px rgba(0,0,0,.3); }
+.plate{ border-width:1px; border-radius:10px; }
+.pname{ font-size:13px; }
+.float{ font-size:15px; }
+.float.crit{ font-size:22px; animation:critPop .9s ease-out forwards; text-shadow:0 0 8px rgba(255,212,94,.85), 1px 1px 0 #000; }
+.etatCombat{ position:absolute; top:36px; left:50%; transform:translateX(-50%); z-index:5; font-family:'Cinzel', Georgia, serif; font-size:12px; letter-spacing:2px; color:#fff; background:rgba(8,10,18,.55); border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:2px 16px; white-space:nowrap; }
+.schip{ border-width:1px; border-radius:var(--r1); padding:4px 10px; font-size:14.5px; }
+.pstats .statcol{ display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.pstats .statcol .schip{ font-size:12.5px; display:flex; justify-content:space-between; gap:6px; }
+.cmdcol .btn{ padding:8px; }
+.loglist{ font-size:13.5px; gap:2px; }
+.loglist div{ opacity:.82; }
+.loglist .limp{ opacity:1; font-weight:600; }
+.toast{ border-width:1px; border-left-width:4px; border-radius:var(--r1); }
+.pnotifs{ transition:flex-basis .18s ease; }
+.pnotifs.mini{ flex:0 0 44px; }
+.pnotifs.mini .notiflist{ overflow:hidden; }
+.jauge{ background:linear-gradient(180deg, rgba(38,45,77,.5), rgba(26,31,56,.6)); border:1px solid #2c3358; border-radius:var(--r2); padding:7px 10px 8px; margin-bottom:7px; }
+.node{ border-radius:10px; padding:5px 8px; transition:border-color .12s, box-shadow .12s; }
+.node .nodedesc{ display:none; }
+.node:hover .nodedesc{ display:block; }
+.node.dispo:hover{ box-shadow:0 0 12px rgba(139,224,95,.45); }
+.node.t3{ border-width:2px; padding:8px 9px; background:linear-gradient(180deg, rgba(60,50,20,.35), rgba(30,36,64,.85)); }
+.node.t3 .nodenom{ font-size:13.5px; color:#ffe08a; }
+.brtitre{ border:1px solid #2c3358; border-radius:var(--r2); padding:5px 4px 6px; background:rgba(0,0,0,.18); margin-bottom:8px; }
+.brprog{ font-family:'Jost', sans-serif; font-size:11.5px; color:var(--dim); font-weight:500; letter-spacing:0; }
+.eqbtn{ border-width:1px; padding:9px 8px; font-size:18px; gap:3px; background:linear-gradient(180deg, #262d4d, #1d2340); box-shadow:0 2px 0 #0c0f1e; }
+.eqbtn small{ font-size:10.5px; color:var(--dim); }
+.eqbtn:hover small{ color:var(--txt); }
+.bfiltres{ display:flex; gap:5px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+.bgrid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(235px, 1fr)); gap:7px; }
+.bcard{ display:flex; gap:8px; align-items:center; border:1px solid #323a68; border-radius:var(--r2); background:linear-gradient(180deg, rgba(38,45,77,.7), rgba(28,34,60,.7)); padding:6px 9px; cursor:pointer; transition:border-color .12s; }
+.bcard:hover{ border-color:#4a548c; }
+.bcard.ouverte{ grid-column:1 / -1; cursor:default; align-items:flex-start; }
+.bcard.bmait{ border-color:rgba(126,224,110,.45); }
+.binfo{ flex:1; min-width:0; }
+.bnom{ font-size:14px; font-weight:600; display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; }
+.bsous{ font-size:12px; color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; }
+.videtat{ text-align:center; color:var(--dim); padding:26px 14px; border:1px dashed #39406a; border-radius:var(--r2); font-size:14.5px; line-height:1.6; }
+.modale{ animation:popIn .16s ease-out; border-width:1px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+.voile{ backdrop-filter:blur(2px); }
+@keyframes glowPulse{ 0%,100%{ box-shadow:0 0 12px rgba(255,224,138,.25), 0 3px 0 #7a5c14; } 50%{ box-shadow:0 0 26px rgba(255,224,138,.6), 0 3px 0 #7a5c14; } }
+@keyframes critPop{ 0%{ transform:scale(.6) translateY(0); opacity:1; } 18%{ transform:scale(1.4) translateY(-6px); } 100%{ transform:scale(1) translateY(-54px); opacity:0; } }
+@keyframes popIn{ from{ transform:scale(.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
+@media (prefers-reduced-motion: reduce){ .btn.prestige,.float.crit,.modale{ animation:none; } }
 `;
 
 /* Accès de test headless (Node) — aucun effet en jeu. */
@@ -3447,6 +3611,8 @@ export default function Transcendance() {
   const [notes, setNotes] = useState(false);
   const [majDispo, setMajDispo] = useState(null);
   const [choixVu, setChoixVu] = useState(0);
+  const [logTout, setLogTout] = useState(false);
+  const [tiroir, setTiroir] = useState(true);
   const [pret, setPret] = useState(false);
   const lastSave = useRef(0);
 
@@ -3516,8 +3682,8 @@ export default function Transcendance() {
       </div>
       <Scene G={G} />
       <div className="tabsbar">
-        {[["boutique", "Boutique"], ["stances", "Stances"], ["equip", "Équipement"], ["best", "Bestiaire"]].concat(renaissanceVisible(G.meta) ? [["origine", "☀ Origine"]] : []).map(([id, nom]) => (
-          <button key={id} className={"tabbtn" + (tab === id ? " on" : "")} onClick={() => { setTab(id); if (id === "equip") { G.dropFlag = false; } }}>
+        {[["boutique", "🛒 Boutique", "#ffd45e"], ["stances", "🥋 Stances", "#79d0c3"], ["equip", "🛡 Équipement", "#6ad4ff"], ["best", "📖 Bestiaire", "#8be05f"]].concat(renaissanceVisible(G.meta) ? [["origine", "☀ Origine", "#ffe08a"]] : []).map(([id, nom, col]) => (
+          <button key={id} className={"tabbtn" + (tab === id ? " on" : "")} style={tab === id ? { color: col, borderBottomColor: col } : null} onClick={() => { setTab(id); if (id === "equip") { G.dropFlag = false; } }}>
             {nom}{id === "equip" && G.dropFlag ? <span className="bulle" /> : null}
           </button>
         ))}
@@ -3577,16 +3743,26 @@ export default function Transcendance() {
             </div>
           </div>
           <div className="panneau pjournal" style={tab === "equip" ? { display: "none" } : null}>
-            <div className="ctitel">Journal de combat</div>
+            <div className="ctitel" style={{ display: "flex", alignItems: "center", gap: 8 }}>Journal de combat
+              <span style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+                <button className={"btn mini" + (!logTout ? " on" : " ghost")} onClick={() => setLogTout(false)}>Important</button>
+                <button className={"btn mini" + (logTout ? " on" : " ghost")} onClick={() => setLogTout(true)}>Tout</button>
+              </span>
+            </div>
             <div className="loglist">
               {(G.log || []).length === 0 ? <div className="dim">Le combat commence…</div> : null}
-              {(G.log || []).slice(-18).map((l) => <div key={l.id} style={{ color: l.col }}>{l.txt}</div>)}
+              {(logTout
+                ? (G.log || []).slice(-18)
+                : (G.log || []).filter((l) => l.imp).slice(-12).concat((G.log || []).slice(-3).filter((l) => !l.imp)).sort((a, b) => a.id - b.id)
+              ).map((l) => <div key={l.id} className={l.imp ? "limp" : ""} style={{ color: l.col }}>{l.txt}</div>)}
             </div>
           </div>
         </div>
       </div>
-      <div className="panneau pnotifs" style={tab === "equip" ? { display: "none" } : null}>
-        <div className="ctitel">Notifications</div>
+      <div className={"panneau pnotifs" + (tiroir ? "" : " mini")} style={tab === "equip" ? { display: "none" } : null}>
+        <div className="ctitel" style={{ display: "flex", alignItems: "center", gap: 8 }}>Notifications
+          <button className="btn mini ghost" style={{ marginLeft: "auto" }} onClick={() => setTiroir(!tiroir)}>{tiroir ? "▾ Replier" : "▴ Déplier"}</button>
+        </div>
         <div className="notiflist">
           {G.toasts.length === 0 ? <div className="dim">Rien à signaler pour l'instant.</div> : null}
           {G.toasts.slice(-10).reverse().map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
