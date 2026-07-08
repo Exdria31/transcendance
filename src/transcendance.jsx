@@ -11,8 +11,17 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.9.1";
+const VERSION = "0.9.2";
 const CHANGELOG = [
+  { v: "0.9.2", date: "8 juillet 2026", titre: "Confort, échelle & composition", points: [
+    "Toute l'interface gagne en échelle : textes, boutons, cartes et valeurs importantes sont plus grands et hiérarchisés — fini de plisser les yeux.",
+    "Chaque écran a son titre et son sous-titre ; la colonne droite devient contextuelle : elle affiche des infos utiles selon l'onglet (jauges proches du palier, stance active, progression de zone, état d'Origine…).",
+    "Les notifications quittent le bas de l'écran : un bouton 🔔 discret ouvre leur tiroir, et les événements importants apparaissent en toasts éphémères en haut à droite. Journal : 3 modes (Important / Tout / Réduit).",
+    "Théâtre de combat recomposé : état au centre avec compteur avant le boss, badges lisibles.",
+    "Équipement plus RPG : personnage et slots agrandis, inventaire à plus grosses cases, et un vrai résumé (puissance, raretés, slots vides, ressources) quand rien n'est sélectionné.",
+    "Arbre d'Origine : nodes compacts avec pastille de rang, clic pour sélectionner et panneau de détail dédié avec bouton d'achat — fini les listes de courses.",
+    "Jauges méta sur deux colonnes, zones altérées à l'ambiance corrompue.",
+  ] },
   { v: "0.9.1", date: "8 juillet 2026", titre: "Grande toilette de l'interface", points: [
     "Design harmonisé partout : bordures fines, panneaux en profondeur, plus d'air, hiérarchie claire — fini l'effet « outil de debug ».",
     "Scène de combat : badge du type d'ennemi (normal / mini-boss / Gardien), état en direct (exploration, boss imminent, AFK, zone altérée), critiques spectaculaires.",
@@ -2403,7 +2412,12 @@ function Scene({ G }) {
         else if (run.kills === 9) { etat = "☠ BOSS IMMINENT"; col = "#ff9d5c"; }
         else if (G.meta.opts.autoRelance) { etat = "EXPLORATION · AFK"; col = "#8be05f"; }
         else { etat = "EXPLORATION"; col = "#b9c4ea"; }
-        return <div className="etatCombat" style={{ color: col, borderColor: col + "55" }}>{alt ? "🌗 ALTÉRÉE · " : ""}{etat}</div>;
+        return (
+          <div className="centreCombat">
+            <div className="etatCombat" style={{ color: col, borderColor: col + "55" }}>{alt ? "🌗 ALTÉRÉE · " : ""}{etat}</div>
+            {!run.over && !(mon && mon.estBoss) ? <div className="etatSous">{run.kills}/10 avant le boss · niveau {run.niveau}/10</div> : null}
+          </div>
+        );
       })()}
       <div className="combattant hero">
         <div className="floats">{G.floats.filter((f) => f.side === "hero").map((f) => <span key={f.id} className={"float " + f.cls} style={{ left: f.x + "%" }}>{f.txt}</span>)}</div>
@@ -2471,6 +2485,7 @@ function TabJauges({ G }) {
   return (
     <div>
       <p className="note">Chaque action nourrit sa jauge <b>en direct</b>, mais les paliers ne sont <b>activés qu'à la fin de la run</b> — meurs ou encaisse pour toucher tes gains.</p>
+      <div className="jlist">
       {GAUGES.map((g) => {
         const gs = G.meta.gauges[g.id];
         const pend = tiersFromTotal(g, gs.total) - gs.applied;
@@ -2491,6 +2506,7 @@ function TabJauges({ G }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
@@ -2592,7 +2608,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
         style={it ? { borderColor: RAR_BY_ID[it.rar].col, boxShadow: glowRar(it.rar) } : null}
         onClick={() => { if (it) { setSelEq(selEq === s.id ? null : s.id); setSel(null); } }}
         onContextMenu={(e) => { e.preventDefault(); if (it) { basculerLock(G, it.id); maj(); } }}>
-        <Spr id={s.ico} scale={4} silhouette={!it} />
+        <Spr id={s.ico} scale={5} silhouette={!it} />
         {it && verrou(meta, it) ? <span className="dlock">{estLie(meta, it.id) ? "🔗" : "🔒"}</span> : null}
         {it && ((it.t || 1) > 1 || (it.a || 0) > 0) ? <span className="dtier">T{rome(it.t || 1)}{it.a ? "·" + it.a : ""}</span> : null}
         <div className="dnom" style={it ? { color: RAR_BY_ID[it.rar].col } : null}>{s.nom}</div>
@@ -2639,7 +2655,20 @@ function TabEquipement({ G, sel, setSel, maj }) {
             <div className="crow"><button className="btn ghost" onClick={() => setSelEq(null)}>Fermer</button></div>
           </div>
         ) : (
-          <div className="videtat" style={{ marginTop: 8 }}>🛡<br />Sélectionne une pièce — dans l'inventaire ou sur le personnage — pour la comparer, l'affiner et l'équiper.<br /><span className="dim" style={{ fontSize: 13 }}>Astuce : clic droit = 🔒 verrouiller · survol = stats</span></div>
+          <div>
+            {(() => {
+              let eqScore = 0, pleins = 0; const totSlots = SLOTS.filter((s) => !s.trans).length;
+              for (const k in meta.equip) if (meta.equip[k]) { eqScore += scoreItem(meta.equip[k]); if (!SLOT_BY_ID[k].trans) pleins++; }
+              return (<>
+                <div className="ctxrow"><span>Puissance d'équipement</span><b>{fmt(Math.round(eqScore))}</b></div>
+                <div className="ctxrow"><span>Slots équipés</span><b style={pleins < totSlots ? { color: "#ffd45e" } : { color: "#8be05f" }}>{pleins}/{totSlots}</b></div>
+                <div className="ctxrow"><span>Meilleure rareté (cycle)</span><b style={{ color: RARS[meta.cycle.bestRar || 0].col }}>{RARS[meta.cycle.bestRar || 0].nom}</b></div>
+                <div className="ctxrow"><span>⚒ Ferraille</span><b>{fmt(meta.ferraille)}</b></div>
+                <div className="ctxrow"><span>✦ Essence résiduelle</span><b style={{ color: "#ff3b5c" }}>{meta.essence}</b></div>
+                <div className="videtat" style={{ marginTop: 10 }}>Sélectionne une pièce — inventaire ou personnage — pour la comparer, l'affiner, la verrouiller.<br /><span className="dim" style={{ fontSize: 13 }}>clic droit = 🔒 · survol = stats · ⚡ équipe le meilleur automatiquement</span></div>
+              </>);
+            })()}
+          </div>
         )}
       </div>
       <div className="eqpanel eqdoll">
@@ -2647,7 +2676,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
         <div className="doll">
           <div className="dollcol">{DOLL_G.map((sid) => Case(SLOT_BY_ID[sid]))}</div>
           <div className="dollmid">
-            <Spr id="hero" scale={6} flip />
+            <Spr id="hero" scale={7} flip />
             <div className="dstance" style={{ color: STANCE_BY_ID[G.run.stance].col }}>{STANCE_BY_ID[G.run.stance].ico} {STANCE_BY_ID[G.run.stance].nom}</div>
             <div className="cinfo dim">{meta.stances[G.run.stance] ? "niv " + meta.stances[G.run.stance].niv + " · évo " + meta.stances[G.run.stance].evo : "stance fixe"}</div>
           </div>
@@ -2683,7 +2712,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
               style={{ borderColor: RAR_BY_ID[it.rar].col, boxShadow: glowRar(it.rar) }}
               onClick={() => { setSel(sel === it.id ? null : it.id); setCible(null); setSelEq(null); }}
               onContextMenu={(e) => { e.preventDefault(); basculerLock(G, it.id); maj(); }}>
-              <Spr id={SLOT_BY_ID[it.slot].ico} scale={3} />
+              <Spr id={SLOT_BY_ID[it.slot].ico} scale={4} />
               {verrou(meta, it) ? <span className="ilock">{estLie(meta, it.id) ? "🔗" : "🔒"}</span> : null}
               {(it.t || 1) > 1 || (it.a || 0) > 0 ? <span className="itier">T{rome(it.t || 1)}</span> : null}
             </div>
@@ -3064,6 +3093,7 @@ function TabOrigine({ G, maj }) {
   const meta = G.meta, o = meta.origine, cy = meta.cycle;
   const [sub, setSub] = useState("ren");
   const [confirmRen, setConfirmRen] = useState(false);
+  const [selNode, setSelNode] = useState(null);
   const calc = calcEclats(G);
   const dispo = renaissanceDispo(meta);
   const b = bonusOrigine(meta);
@@ -3112,6 +3142,25 @@ function TabOrigine({ G, maj }) {
       {sub === "arbre" ? (
         <div>
           <div className="arbretronc">🌳 LE TRONC · {o.ren} Renaissance{o.ren > 1 ? "s" : ""} · ❖ {fmt(o.eclats)} disponibles</div>
+          {selNode && NODE_BY_ID[selNode] ? (() => {
+            const n = NODE_BY_ID[selNode];
+            const rang = o.arbre[n.id] || 0;
+            const reqOk = !n.req || o.arbre[n.req] > 0;
+            const maxed = rang >= n.max;
+            const c = coutNode(n, rang);
+            const br = BRANCHES.find((b2) => b2.id === n.br);
+            return (
+              <div className="nodedetail">
+                <b style={{ color: br.col, fontFamily: "'Cinzel', Georgia, serif", fontSize: 16 }}>{br.ico} {n.nom}</b>
+                <span className="dim">{br.nom} · palier {n.tier + 1}/4</span>
+                <span>{n.desc.replace("{v}", String(n.val).replace(".", ","))}</span>
+                <span>Rang <b>{rang}/{n.max}</b>{rang > 0 ? <span className="dim"> · effet total : {String(Math.round(n.val * rang * 100) / 100).replace(".", ",")}</span> : null}</span>
+                {!reqOk ? <span style={{ color: "#ff6b6b" }}>🔒 Requiert : {NODE_BY_ID[n.req].nom}</span> : null}
+                <button className="btn" disabled={maxed || !reqOk || o.eclats < c} style={{ marginLeft: "auto" }} onClick={() => { acheterNode(G, n.id); maj(); }}>{maxed ? "RANG MAX" : "Acheter · ❖ " + fmt(c)}</button>
+                <button className="btn mini ghost" onClick={() => setSelNode(null)}>✕</button>
+              </div>
+            );
+          })() : <div className="cinfo dim" style={{ textAlign: "center", marginBottom: 8 }}>Clique un node pour voir son détail et l'acheter.</div>}
           <div className="arbre">
             {BRANCHES.map((br) => (
               <div key={br.id} className="branche">
@@ -3127,13 +3176,13 @@ function TabOrigine({ G, maj }) {
                     const c = coutNode(n, rang);
                     const desc = n.desc.replace("{v}", String(n.val).replace(".", ","));
                     return (
-                      <div key={n.id} className={"node" + (n.tier === 3 ? " t3" : "") + (maxed ? " maxed" : reqOk ? (o.eclats >= c ? " dispo" : " cher") : " verrou")}
+                      <div key={n.id} className={"node" + (n.tier === 3 ? " t3" : "") + (maxed ? " maxed" : reqOk ? (o.eclats >= c ? " dispo" : " cher") : " verrou") + (selNode === n.id ? " selnode" : "")}
                         style={maxed ? { borderColor: br.col } : null}
                         title={desc + (rang > 0 ? " — total actuel : " + String(Math.round(n.val * rang * 100) / 100).replace(".", ",") : "") + (reqOk ? "" : " (node précédent requis)")}
-                        onClick={() => { if (reqOk && !maxed) { acheterNode(G, n.id); maj(); } }}>
-                        <div className="nodenom">{n.nom}</div>
-                        <div className="nodedesc">{desc}</div>
-                        <div className="nodebas">{maxed ? "MAX " + rang + "/" + n.max : rang + "/" + n.max + " · ❖ " + fmt(c)}</div>
+                        onClick={() => setSelNode(selNode === n.id ? null : n.id)}>
+                        <span className="nrang">{maxed ? "★" : rang}</span>
+                        <span className="nodenom">{n.nom}</span>
+                        <span className="nodebas">{maxed ? "MAX" : "❖ " + fmt(c)}</span>
                       </div>
                     );
                   })}
@@ -3187,7 +3236,7 @@ function TabOrigine({ G, maj }) {
               const actif = altActive(meta, a.zoneId);
               const locked = !altsDebloquees(meta);
               return (
-                <div key={a.id} className="carte" style={{ borderColor: actif ? ZONE_BY_ID[a.zoneId].col : undefined, opacity: locked ? 0.5 : 1 }}>
+                <div key={a.id} className="carte carteAlt" style={{ borderColor: actif ? ZONE_BY_ID[a.zoneId].col : "#4a3a7a", opacity: locked ? 0.5 : 1 }}>
                   <div className="ctitre small" style={{ color: ZONE_BY_ID[a.zoneId].col }}>🌗 {a.nom} <span className="badge2" style={{ borderColor: "#7a6aff", color: "#9a8aff" }}>Altérée</span> <span className="niv">{ZONE_BY_ID[a.zoneId].nom}</span></div>
                   <div className="cinfo dim">{a.desc}</div>
                   <div className="cinfo" style={{ color: "#ff6b6b" }}>PV ×{String(a.mob.hp).replace(".", ",")} · ATQ ×{String(a.mob.atk).replace(".", ",")}{a.mob.as !== 1 ? " · Vitesse ×" + String(a.mob.as).replace(".", ",") : ""}{a.mob.bossHp ? " · PV boss ×" + String(a.mob.bossHp).replace(".", ",") : ""}</div>
@@ -3216,6 +3265,58 @@ function TabOrigine({ G, maj }) {
       ) : null}
     </div>
   );
+}
+
+/* Panneau contextuel de la colonne droite (change selon l'onglet actif). */
+function ContexteRail({ G, tab }) {
+  const meta = G.meta, run = G.run;
+  if (tab === "boutique") {
+    const proches = GAUGES.map((g) => {
+      const gs = meta.gauges[g.id];
+      const t = tiersFromTotal(g, gs.total);
+      const deja = cumReq(g, t), proch = cumReq(g, t + 1);
+      return { g, p: (gs.total - deja) / Math.max(1, proch - deja) };
+    }).sort((a, b) => b.p - a.p).slice(0, 3);
+    const pend = GAUGES.reduce((a, g) => a + Math.max(0, tiersFromTotal(g, meta.gauges[g.id].total) - meta.gauges[g.id].applied), 0);
+    return (<>
+      <div className="ctitel">Contexte · Boutique</div>
+      {proches.map(({ g, p }) => <div key={g.id} className="ctxrow"><span style={{ color: g.col }}>{g.ico} {g.nom}</span><b>{Math.round(p * 100)}% du palier</b></div>)}
+      <div className="ctxrow"><span>Paliers en attente</span><b style={pend > 0 ? { color: "#ffd45e" } : null}>{pend}</b></div>
+      <div className="ctxrow"><span>Rabais boutique</span><b>−{(100 * (1 - rabaisShop(meta))).toFixed(1).replace(".", ",")}%</b></div>
+    </>);
+  }
+  if (tab === "stances") {
+    const sd = STANCE_BY_ID[run.stance], stn = meta.stances[sd.id];
+    return (<>
+      <div className="ctitel">Contexte · Stance</div>
+      <div className="ctxrow"><span style={{ color: sd.col }}>{sd.ico} {sd.nom}</span><b>{stn ? "niv " + stn.niv + " · évo " + stn.evo : "fixe"}</b></div>
+      {stn ? <div className="ctxrow"><span>Prochain niveau</span><b>⬡ {nivCost(stn.niv)} <span className="dim">({meta.tokens} dispo)</span></b></div> : null}
+      {stn ? <div className="ctxrow"><span>Évolution {stn.evo + 1}</span><b>au niveau {(stn.evo + 1) * 5}</b></div> : null}
+    </>);
+  }
+  if (tab === "best") {
+    const zid = ZONES[run.zoneIdx].id, monz = monstresDe(zid), rm = reqMult(meta, zid);
+    const mait = monz.filter((m) => estMaitrise(m, meta.best[m.id] || 0, rm)).length;
+    return (<>
+      <div className="ctitel">Contexte · {ZONE_BY_ID[zid].nom}</div>
+      <div className="ctxrow"><span>Maîtrise de zone</span><b style={mait === monz.length ? { color: "#8be05f" } : null}>{mait}/{monz.length}</b></div>
+      <div className="ctxrow"><span>Gardien</span><b>{meta.cycle.gardiens[zid] ? "vaincu ✓" : "à vaincre"}</b></div>
+      <div className="ctxrow"><span>Transcendance</span><b>{meta.zones[zid].trans}</b></div>
+      <div className="ctxrow"><span>Or de maîtrise global</span><b style={{ color: "#ffd45e" }}>+{bestGoldBonus(meta)}%</b></div>
+    </>);
+  }
+  if (tab === "origine") {
+    const o = meta.origine, calc = calcEclats(G);
+    return (<>
+      <div className="ctitel">Contexte · Origine</div>
+      <div className="ctxrow"><span>❖ Éclats</span><b style={{ color: "#ffe08a" }}>{fmt(o.eclats)}</b></div>
+      <div className="ctxrow"><span>Gain estimé</span><b>+{fmt(calc.total)} <span className="dim">×{String(calc.mult).replace(".", ",")}</span></b></div>
+      <div className="ctxrow"><span>Renaissance</span><b style={renaissanceDispo(meta) ? { color: "#ffe08a" } : null}>{renaissanceDispo(meta) ? "DISPONIBLE ☀" : "zone 5 requise"}</b></div>
+      <div className="ctxrow"><span>Échos équipés</span><b>{o.echosEq.length}/{echoSlotsMax(meta)}</b></div>
+      <div className="ctxrow"><span>Serments actifs</span><b>{o.sermentsActifs.length}/{sermentsMax(meta)}</b></div>
+    </>);
+  }
+  return null;
 }
 
 /* ============================================================
@@ -3588,6 +3689,76 @@ const CSS = `
 @keyframes critPop{ 0%{ transform:scale(.6) translateY(0); opacity:1; } 18%{ transform:scale(1.4) translateY(-6px); } 100%{ transform:scale(1) translateY(-54px); opacity:0; } }
 @keyframes popIn{ from{ transform:scale(.94); opacity:0; } to{ transform:scale(1); opacity:1; } }
 @media (prefers-reduced-motion: reduce){ .btn.prestige,.float.crit,.modale{ animation:none; } }
+
+/* ============================================================
+   v0.9.2 — ÉCHELLE, COMPOSITION & CONFORT
+   ============================================================ */
+.trx{ font-size:17px; }
+.ctitre{ font-size:17px; } .ctitre.small{ font-size:15px; }
+.cinfo{ font-size:15px; } .note{ font-size:14.5px; padding:7px 11px; }
+.statline b{ font-size:16.5px; }
+.btn{ padding:9px 14px; font-size:14px; }
+.btn.mini{ padding:5px 10px; font-size:12px; }
+.btn.big{ padding:13px 16px; font-size:16px; }
+.carte{ padding:12px 14px; gap:5px; }
+.panneau{ padding:14px 16px; }
+.tabbtn{ font-size:16px; padding:11px 4px; }
+.reschip{ padding:4px 16px; }
+.tbgauche .tbside{ font-size:19px; }
+.tbdim{ font-size:15px; }
+.zlabel{ font-size:17px; }
+.niv{ font-size:12.5px; }
+.schip{ font-size:15px; padding:5px 11px; }
+.schip b{ font-size:16px; }
+.pstats .statcol .schip{ font-size:13px; }
+.pstats .statcol .schip b{ font-size:14.5px; }
+.jhead{ font-size:19px; }
+.jeff{ font-size:15px; }
+.badge2{ font-size:11px; padding:2px 8px; }
+.invnom{ font-size:16.5px; }
+.mtitre{ font-size:22px; }
+.mgain,.mstats{ font-size:15.5px; }
+/* titres d'écran par onglet */
+.ecrantitre{ display:flex; align-items:baseline; gap:12px; border-bottom:1px solid #2c3358; padding-bottom:8px; margin-bottom:12px; }
+.ecrantitre h2{ font-family:'Cinzel', Georgia, serif; font-size:20px; margin:0; letter-spacing:1.5px; }
+.ecrantitre .sous{ font-size:13.5px; color:var(--dim); }
+/* scène : composition centre */
+.centreCombat{ position:absolute; top:34px; left:50%; transform:translateX(-50%); z-index:5; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.etatCombat{ position:static; transform:none; }
+.etatSous{ font-size:12.5px; color:#fff; opacity:.75; background:rgba(8,10,18,.45); border-radius:999px; padding:1px 12px; }
+/* équipement : plus grand, plus RPG */
+.dcase{ width:96px; padding:9px 5px 5px; }
+.dnom{ font-size:10px; margin-top:5px; }
+.dtier{ font-size:11px; }
+.invgrid{ grid-template-columns:repeat(auto-fill, minmax(66px, 1fr)); gap:7px; }
+.eqdoll .dollmid{ flex:0 1 300px; }
+/* jauges boutique sur 2 colonnes */
+.jlist{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.jlist .jauge{ margin-bottom:0; }
+@media (max-width:1500px){ .jlist{ grid-template-columns:1fr; } }
+/* arbre : nodes compacts + panneau détail */
+.node{ display:flex; align-items:center; gap:7px; padding:6px 8px; }
+.node .nodedesc{ display:none !important; }
+.nodenom{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nodebas{ margin-top:0; white-space:nowrap; font-size:11.5px; }
+.node .nrang{ flex:0 0 auto; width:26px; height:26px; border-radius:50%; border:2px solid #39406a; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; background:rgba(0,0,0,.3); }
+.node.maxed .nrang{ border-color:#ffe08a; color:#ffe08a; }
+.node.dispo .nrang{ border-color:#8be05f; }
+.node.selnode{ outline:2px solid var(--cyan); }
+.nodedetail{ border:1px solid #c9a22755; border-radius:var(--r2); background:linear-gradient(180deg, rgba(60,50,20,.25), rgba(22,27,46,.8)); padding:10px 14px; margin-bottom:10px; display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; }
+/* rail contextuelle */
+.pctx{ grid-column:1 / -1; }
+.ctxrow{ display:flex; justify-content:space-between; gap:8px; font-size:14px; padding:3px 0; border-bottom:1px dashed #2c3358; }
+.ctxrow:last-child{ border-bottom:none; }
+/* toasts flottants */
+.toastsFlot{ position:fixed; top:64px; right:16px; z-index:75; display:flex; flex-direction:column; gap:6px; width:min(360px, 90vw); pointer-events:none; }
+.toastsFlot .toast{ box-shadow:0 6px 18px rgba(0,0,0,.45); background:rgba(15,19,38,.97); }
+/* bouton + tiroir notifications */
+.notifbtn{ position:fixed; right:16px; bottom:12px; z-index:56; }
+.notifdrawer{ position:fixed; right:16px; bottom:58px; z-index:56; width:min(460px, 92vw); max-height:46vh; overflow-y:auto; background:rgba(18,22,42,.98); border:1px solid #39406a; border-radius:var(--r2); box-shadow:0 12px 40px rgba(0,0,0,.55); padding:10px 12px; display:flex; flex-direction:column; gap:5px; animation:popIn .14s ease-out; }
+/* zones altérées : ambiance corrompue */
+.carteAlt{ background:linear-gradient(180deg, rgba(38,24,66,.85), rgba(16,10,34,.9)) !important; }
+.zoneDroite{ grid-template-rows:auto auto minmax(0,1fr); }
 `;
 
 /* Accès de test headless (Node) — aucun effet en jeu. */
@@ -3611,8 +3782,9 @@ export default function Transcendance() {
   const [notes, setNotes] = useState(false);
   const [majDispo, setMajDispo] = useState(null);
   const [choixVu, setChoixVu] = useState(0);
-  const [logTout, setLogTout] = useState(false);
-  const [tiroir, setTiroir] = useState(true);
+  const [logMode, setLogMode] = useState("imp");
+  const [tiroir, setTiroir] = useState(false);
+  const [notifVu, setNotifVu] = useState(0);
   const [pret, setPret] = useState(false);
   const lastSave = useRef(0);
 
@@ -3691,6 +3863,16 @@ export default function Transcendance() {
       <div className={"colonnes" + (tab === "equip" ? " modeEquip" : "")}>
         <div className="colG">
           <div className="panneau">
+            {(() => {
+              const TE = {
+                boutique: ["🛒 Boutique", "Améliorations de run et jauges méta", "#ffd45e"],
+                stances: ["🥋 Stances", "Choisis ton style de cycle", "#79d0c3"],
+                equip: null,
+                best: ["📖 Bestiaire", "Maîtrise des monstres et progression de zone", "#8be05f"],
+                origine: ["☀ Origine", "Renaissance, Éclats, Arbre, Échos et Serments", "#ffe08a"],
+              }[tab];
+              return TE ? <div className="ecrantitre"><h2 style={{ color: TE[2] }}>{TE[0]}</h2><span className="sous">{TE[1]}</span></div> : null;
+            })()}
             {tab === "boutique" ? <TabBoutique G={G} maj={maj} /> : null}
             {tab === "stances" ? <TabStances G={G} maj={maj} /> : null}
             {tab === "equip" ? <TabEquipement G={G} sel={sel} setSel={setSel} maj={maj} /> : null}
@@ -3742,32 +3924,44 @@ export default function Transcendance() {
               <button className="btn" onClick={() => setOpts(true)}>⚙ PARAMÈTRES</button>
             </div>
           </div>
+          <div className="panneau pcote pctx" style={tab === "equip" ? { display: "none" } : null}>
+            <ContexteRail G={G} tab={tab} />
+          </div>
           <div className="panneau pjournal" style={tab === "equip" ? { display: "none" } : null}>
             <div className="ctitel" style={{ display: "flex", alignItems: "center", gap: 8 }}>Journal de combat
               <span style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                <button className={"btn mini" + (!logTout ? " on" : " ghost")} onClick={() => setLogTout(false)}>Important</button>
-                <button className={"btn mini" + (logTout ? " on" : " ghost")} onClick={() => setLogTout(true)}>Tout</button>
+                {[["imp", "Important"], ["tout", "Tout"], ["mini", "Réduit"]].map(([id, nom]) => (
+                  <button key={id} className={"btn mini" + (logMode === id ? " on" : " ghost")} onClick={() => setLogMode(id)}>{nom}</button>
+                ))}
               </span>
             </div>
             <div className="loglist">
               {(G.log || []).length === 0 ? <div className="dim">Le combat commence…</div> : null}
-              {(logTout
-                ? (G.log || []).slice(-18)
-                : (G.log || []).filter((l) => l.imp).slice(-12).concat((G.log || []).slice(-3).filter((l) => !l.imp)).sort((a, b) => a.id - b.id)
+              {(logMode === "mini"
+                ? (G.log || []).slice(-1)
+                : logMode === "tout"
+                  ? (G.log || []).slice(-18)
+                  : (G.log || []).filter((l) => l.imp).slice(-12).concat((G.log || []).slice(-3).filter((l) => !l.imp)).sort((a, b) => a.id - b.id)
               ).map((l) => <div key={l.id} className={l.imp ? "limp" : ""} style={{ color: l.col }}>{l.txt}</div>)}
             </div>
           </div>
         </div>
       </div>
-      <div className={"panneau pnotifs" + (tiroir ? "" : " mini")} style={tab === "equip" ? { display: "none" } : null}>
-        <div className="ctitel" style={{ display: "flex", alignItems: "center", gap: 8 }}>Notifications
-          <button className="btn mini ghost" style={{ marginLeft: "auto" }} onClick={() => setTiroir(!tiroir)}>{tiroir ? "▾ Replier" : "▴ Déplier"}</button>
-        </div>
-        <div className="notiflist">
-          {G.toasts.length === 0 ? <div className="dim">Rien à signaler pour l'instant.</div> : null}
-          {G.toasts.slice(-10).reverse().map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
-        </div>
+      <div className="toastsFlot">
+        {G.toasts.filter((t) => G.now - t.t < 4200).slice(-3).map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
       </div>
+      <button className="btn mini notifbtn" onClick={() => { const dernier = G.toasts.length ? G.toasts[G.toasts.length - 1].id : 0; setTiroir(!tiroir); setNotifVu(dernier); }}>
+        🔔 Notifications{(() => { const n = G.toasts.filter((t) => t.id > notifVu).length; return n > 0 && !tiroir ? " (" + n + ")" : ""; })()}
+      </button>
+      {tiroir ? (
+        <div className="notifdrawer">
+          <div className="ctitel" style={{ display: "flex", alignItems: "center" }}>Notifications
+            <button className="btn mini ghost" style={{ marginLeft: "auto" }} onClick={() => setTiroir(false)}>✕</button>
+          </div>
+          {G.toasts.length === 0 ? <div className="dim">Rien à signaler pour l'instant.</div> : null}
+          {G.toasts.slice(-30).reverse().map((t) => <div key={t.id} className="toast" style={{ borderLeftColor: t.col }}>{t.txt}</div>)}
+        </div>
+      ) : null}
       {!G.meta.opts.autoRelance ? <ModaleFin G={G} maj={maj} /> : null}
       {opts ? <ModaleOpts G={G} fermer={() => setOpts(false)} maj={maj} voirNotes={() => { setOpts(false); setNotes(true); }} /> : null}
       {notes ? <ModaleNouveautes G={G} fermer={() => { G.meta.versionVue = VERSION; G.saveNow = true; setNotes(false); }} /> : null}
