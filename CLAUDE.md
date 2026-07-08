@@ -22,6 +22,9 @@ Tests headless : export `__test` en fin de jsx — bundler un entry Node avec es
   slots, stances) ; toute migration se fait dans `depuisSave`.
 - Sprites : grilles de chaînes (1 char = 1 pixel), toutes les rangées d'une
   grille doivent avoir la même longueur, chaque char doit exister dans la palette `p`.
+- TRAÇABILITÉ : toute idée évoquée puis reportée, écartée ou laissée sans décision
+  doit être consignée dans `ROADMAP.md` (sections « Idées en suspens » ou « Backlog »)
+  avant la fin de la session. Rien ne doit se perdre entre deux conversations.
 
 ## Versions & mises à jour
 - Source de vérité : `const VERSION` dans `src/transcendance.jsx` ; garder

@@ -36,6 +36,17 @@
 - L'arme de Transcendance équipée est **dérivée** (recalculée), jamais stockée comme item libre.
 - Les items d'ensembles sont auto-verrouillés (🔗) ; délier = seul moyen de déverrouiller.
 
+## Idées en suspens (évoquées, jamais tranchées — à re-proposer au bon moment)
+- Poids d'« Équiper le meilleur » **dépendants de la stance active** (proposé en v0.5.6, resté sans réponse).
+- **Release GitHub « version stable »** avec exe frais (proposé quand 0.8.5 a été déclarée stable, sans suite).
+- **Modale de récompense dédiée post-Renaissance** (actuellement : toast + modale de choix d'Écho).
+- **Tri du Bestiaire** (par progression / kills / danger / or) — les filtres existent, le tri non.
+- **Suggestion du meilleur achat** dans le contexte Boutique de la rail droite (spec 0.9.2, non fait).
+- **Micro-shake / highlight** quand un Gardien est vaincu (spec 0.9.3, non fait).
+- Système de **tooltips riche** (au-delà des `title` natifs) : panneaux au survol stylisés.
+- Cap d'inventaire d'Échos : fixé à 60 (le spec disait « 50 ou 100 ») — à valider.
+- Toasts : formaliser des **catégories de couleur** systématiques (progression/loot/boss/origine/système).
+
 ## Backlog / reporté (par ordre de probabilité)
 - Équilibrage fin de tout le pan Origine (coûts nodes, formule Éclats, odds Échos, mur zone 5).
 - Arbre d'Origine en **vrai graphe dessiné** (connecteurs courbes, layout non-colonnes) — demandé
