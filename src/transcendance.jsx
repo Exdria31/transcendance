@@ -141,7 +141,15 @@ const BAL = {
   shop: { atkC: 12, atkCG: 1.18, atkV: 5, hpC: 15, hpCG: 1.20, hpV: 5, heal: 0.3 },
   drop: { normal: 0.05, mini: 0.45, zone: 1.0, tw_mini: 0.10, tw_zone: 0.35 },
   defK: 150, spawn: 0.7, healKill: 0.02, bestDmg: 3, bestRes: 3, bestGold: 2, transReq: 2.5,
+  /* Scaling de continent centralisé : à partir de la zone murZone+1 (index murZone),
+     chaque zone multiplie brutalement les ennemis. Seule source de vérité. */
+  ren: { murZone: 3, multHp: 8, multAtk: 6.5, multGold: 4.5 },
 };
+/* Multiplicateur de zone (index 0-based). Neutre jusqu'à l'index murZone-1. */
+function zScale(zi) {
+  const n = Math.max(0, zi - BAL.ren.murZone);
+  return { hp: Math.pow(BAL.ren.multHp, n), atk: Math.pow(BAL.ren.multAtk, n), gold: Math.pow(BAL.ren.multGold, n) };
+}
 
 /* ---------- utils ---------- */
 const R = Math.random;
@@ -180,6 +188,13 @@ function fmtM(v) {
 }
 const pct = (v) => (v > 0 ? "+" : "") + (Math.round(v * 10) / 10).toString().replace(".", ",") + "%";
 let UID = 1; const uid = () => UID++;
+/* Mélange une couleur hex vers une autre (k = 0..1). Sert aux sprites recolorés des zones 4-15. */
+function teinte(hex, vers, k) {
+  const a = parseInt(hex.slice(1), 16), b = parseInt(vers.slice(1), 16);
+  const mx = (x, y) => Math.round(x + (y - x) * k);
+  const r = mx((a >> 16) & 255, (b >> 16) & 255), g = mx((a >> 8) & 255, (b >> 8) & 255), bl = mx(a & 255, b & 255);
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + bl).toString(16).slice(1);
+}
 
 /* ---------- sprites (pixel art 16×16, dessinés main) ---------- */
 const P = {
@@ -1096,6 +1111,18 @@ const ARMES_T = {
   foret:  { nom: "Sylvaria, Lame du Bosquet",   col: "#8be05f", main: { stat: "goldP", parNiv: 50 }, subs: [{ stat: "gaugeP", parNiv: 10 }, { stat: "atkP", parNiv: 8 }] },
   desert: { nom: "Simoun, Croc des Dunes",      col: "#ffd45e", main: { stat: "atkP", parNiv: 45 }, subs: [{ stat: "critD", parNiv: 20 }, { stat: "vsBossP", parNiv: 10 }] },
   ocean:  { nom: "Abyssale, Dent des Marées",   col: "#6ad4ff", main: { stat: "hpP", parNiv: 50 }, subs: [{ stat: "defF", parNiv: 15 }, { stat: "hpF", parNiv: 60 }] },
+  montagne:  { nom: "Égide, Rempart des Cimes",      col: "#cbb69d", main: { stat: "hpP", parNiv: 45 }, subs: [{ stat: "defF", parNiv: 25 }, { stat: "hpF", parNiv: 120 }] },
+  plaines:   { nom: "Foudroyeuse, Sœur de l'Orage",  col: "#a8d8ff", main: { stat: "asP", parNiv: 30 }, subs: [{ stat: "critC", parNiv: 4 }, { stat: "critD", parNiv: 15 }] },
+  glacier:   { nom: "Hivernale, Morsure du Gel",     col: "#bfe8ff", main: { stat: "hpP", parNiv: 40 }, subs: [{ stat: "hpF", parNiv: 250 }, { stat: "gaugeP", parNiv: 8 }] },
+  volcan:    { nom: "Pyrelame, Colère du Magma",     col: "#ff7a45", main: { stat: "atkP", parNiv: 55 }, subs: [{ stat: "critD", parNiv: 30 }] },
+  marais:    { nom: "Bourbierre, Faux des Vases",    col: "#9fb85a", main: { stat: "gaugeP", parNiv: 22 }, subs: [{ stat: "goldP", parNiv: 20 }] },
+  ruines:    { nom: "Mémoria, Éclat du Passé",       col: "#d8cfa8", main: { stat: "gaugeP", parNiv: 18 }, subs: [{ stat: "goldP", parNiv: 15 }, { stat: "vsBossP", parNiv: 10 }] },
+  citadelle: { nom: "Astralis, Juge des Étoiles",    col: "#c59bff", main: { stat: "vsBossP", parNiv: 50 }, subs: [{ stat: "critD", parNiv: 20 }] },
+  jungle:    { nom: "Prédatrice, Croc Primordial",   col: "#45d06a", main: { stat: "goldP", parNiv: 45 }, subs: [{ stat: "atkP", parNiv: 18 }] },
+  abysses:   { nom: "Nocturne, Serre des Profondeurs", col: "#7a6aff", main: { stat: "hpP", parNiv: 55 }, subs: [{ stat: "defF", parNiv: 30 }, { stat: "gaugeP", parNiv: 8 }] },
+  verre:     { nom: "Prismatique, Aiguille Solaire", col: "#e8f4ff", main: { stat: "critD", parNiv: 40 }, subs: [{ stat: "critC", parNiv: 3 }, { stat: "goldP", parNiv: 15 }] },
+  ciel:      { nom: "Céleste, Plume du Firmament",   col: "#8ad4ff", main: { stat: "asP", parNiv: 35 }, subs: [{ stat: "gaugeP", parNiv: 12 }] },
+  coeur:     { nom: "Originelle, Battement Premier", col: "#ff5fd0", main: { stat: "atkP", parNiv: 22 }, subs: [{ stat: "hpP", parNiv: 22 }, { stat: "goldP", parNiv: 22 }, { stat: "gaugeP", parNiv: 10 }] },
 };
 const ROME = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 const rome = (n) => ROME[n - 1] || "×" + n;
@@ -1225,7 +1252,7 @@ function metaInitiale() {
     tokens: 0,
     stances: Object.fromEntries(STANCES.filter((s) => !s.fixe).map((s) => [s.id, { niv: 1, evo: 0 }])),
     best: Object.fromEntries(MONSTRES.map((m) => [m.id, 0])),
-    zones: { foret: { trans: 0 }, desert: { trans: 0 }, ocean: { trans: 0 } },
+    zones: Object.fromEntries(ZONES.map((z) => [z.id, { trans: 0 }])),
     equip: Object.fromEntries(SLOTS.map((s) => [s.id, null])),
     inv: [],
     vie: { runs: 0, meilleure: 0, kills: 0, or: 0 },
@@ -1242,7 +1269,7 @@ function metaInitiale() {
 }
 function runInitiale() {
   return {
-    zoneIdx: 0, niveau: 1, nivZone: [1, 1, 1], debloque: 0, kills: 0, stance: "voyageur",
+    zoneIdx: 0, niveau: 1, nivZone: ZONES.map(() => 1), debloque: 0, kills: 0, stance: "voyageur",
     lvlAtk: 0, lvlHp: 0, gold: 0, tokensPend: 0,
     hp: -1, mon: null, spawnT: BAL.spawn * 0.6, hG: 0, mG: 0,
     over: false, morte: false, gains: null, essences: [],
@@ -1275,7 +1302,8 @@ function heroStats(G) {
   };
 }
 
-function creerMonstre(zoneIdx, niveau, idx) {
+function creerMonstre(G, zoneIdx, niveau, idx) {
+  const meta = G.meta;
   const z = ZONES[zoneIdx];
   const estBoss = idx === 9;
   const monz = monstresDe(z.id);
@@ -1289,12 +1317,15 @@ function creerMonstre(zoneIdx, niveau, idx) {
   }
   const L = zoneIdx * 10 + niveau;
   const bm = estBoss ? (def.type === "zone" ? BAL.zbos : BAL.boss) : null;
-  const hp = BAL.mob.hp * Math.pow(BAL.mob.hpG, L - 1) * def.hpM * (bm ? bm.hp : 1) * (estBoss ? 1 : 1 + idx * 0.05);
+  const zs = zScale(zoneIdx);
+  const alt = altMods(meta, z.id);
+  const mm = G.oM || MALUS_NEUTRE;
+  const hp = BAL.mob.hp * Math.pow(BAL.mob.hpG, L - 1) * def.hpM * (bm ? bm.hp : 1) * (estBoss ? 1 : 1 + idx * 0.05) * zs.hp * alt.hp * (estBoss && alt.bossHp ? alt.bossHp : 1);
   return {
     def, estBoss, hp, hpMax: hp,
-    atk: BAL.mob.atk * Math.pow(BAL.mob.atkG, L - 1) * def.atkM * (bm ? bm.atk : 1),
-    gold: BAL.mob.gold * Math.pow(BAL.mob.goldG, L - 1) * def.goldM * (bm ? bm.gold : 1),
-    as: BAL.mob.as * def.asM * (bm ? bm.as : 1),
+    atk: BAL.mob.atk * Math.pow(BAL.mob.atkG, L - 1) * def.atkM * (bm ? bm.atk : 1) * zs.atk * alt.atk * mm.mobAtk,
+    gold: BAL.mob.gold * Math.pow(BAL.mob.goldG, L - 1) * def.goldM * (bm ? bm.gold : 1) * zs.gold * alt.gold,
+    as: BAL.mob.as * def.asM * (bm ? bm.as : 1) * alt.as,
   };
 }
 
@@ -1423,7 +1454,7 @@ function tick(G, dt) {
   run.hp = Math.min(run.hp, st.hpMax);
   if (!run.mon) {
     run.spawnT -= dt;
-    if (run.spawnT <= 0) { run.mon = creerMonstre(run.zoneIdx, run.niveau, run.kills); run.mG = 0; }
+    if (run.spawnT <= 0) { run.mon = creerMonstre(G, run.zoneIdx, run.niveau, run.kills); run.mG = 0; }
     return;
   }
   run.hG += dt * st.as;
@@ -1689,6 +1720,153 @@ const FONDS = [
   { hb: [226, 198, 148], hg: [42, 40, 34], blobs: ["#c8a45e", "#b8945a", "#d8b878", "#e0c890"], tA: "#3f7a3f", tB: "#4f9a4f", canop: false, solA: "#d8bc84", solB: "#d0b478", ch: "#b89454", chC: "#c8a868", herbe: "#c0a05e", deco: ["#8a7a5e", "#ffffff", "#e86a5a", "#5a8a5a", "#ffd45e"], ray: 0.09 },
   { hb: [64, 128, 178], hg: [55, 65, 60], blobs: ["#1f6a7a", "#2a8a8a", "#e86a8a", "#3aa89a"], tA: "#2a7a4a", tB: "#3a9a5a", canop: false, solA: "#c8b890", solB: "#c0b088", ch: "#b0a078", chC: "#c4b48c", herbe: "#2a8a7a", deco: ["#ffd45e", "#ff9ec2", "#ffffff", "#5fffe0", "#e86a8a"], ray: 0.2 },
 ];
+
+/* ============================================================
+   ZONES 4 → 15 — générées data-driven (v0.9.0)
+   Chaque zone réutilise les grilles de sprites d'une zone source,
+   recolorées vers sa teinte (sprites dédiés lors d'une passe de polish).
+   11 monstres par zone : 8 normaux, 2 mini-boss, 1 Gardien.
+   ============================================================ */
+const ZONES_EXT = [
+  { id: "montagne", nom: "Montagne", col: "#cbb69d", tint: "#8d8d9c", src: "foret",
+    theme: "Les cimes où l'air se raréfie et où la pierre se souvient.",
+    noms: ["Bouquetin Têtu", "Aigle Royal", "Éboulis Vivant", "Yéti Bougon", "Harpie Criarde", "Lynx des Neiges", "Chèvre Possédée", "Mouflon Blindé", "Golem de Granit", "Wyverne des Cimes", "Colosse des Cimes"] },
+  { id: "plaines", nom: "Plaines Orageuses", col: "#a8d8ff", tint: "#5a7ac8", src: "desert",
+    theme: "Des herbes hautes fouettées par une tempête qui ne finit jamais.",
+    noms: ["Zébu Foudroyé", "Rapace Voltaïque", "Herbe-qui-Mord", "Taureau Tonnerre", "Feu Follet", "Coyote Crépitant", "Épouvantail Frappé", "Élémentaire d'Orage", "Golem de Foudre", "Nuée Hurlante", "Seigneur des Tempêtes"] },
+  { id: "glacier", nom: "Glacier", col: "#bfe8ff", tint: "#7ab8e8", src: "ocean",
+    theme: "Un froid si ancien qu'il a sa propre volonté.",
+    noms: ["Pingouin Batailleur", "Loup Polaire", "Stalactite Animée", "Morse Grognon", "Spectre Gelé", "Renard Arctique", "Élémentaire de Givre", "Ours Ronchon", "Golem de Glace", "Wendigo Affamé", "Cœur du Blizzard"] },
+  { id: "volcan", nom: "Volcan", col: "#ff7a45", tint: "#c8402a", src: "foret",
+    theme: "La montagne qui gronde. Tout y brûle, même les regrets.",
+    noms: ["Salamandre Ardente", "Chauve-souris de Cendre", "Magma Rampant", "Diablotin Rieur", "Scorie Vivante", "Cerbère Nain", "Phénix Déplumé", "Élémentaire de Lave", "Golem d'Obsidienne", "Éfrit Colérique", "Titan Magmatique"] },
+  { id: "marais", nom: "Marais Putride", col: "#9fb85a", tint: "#5a6e2a", src: "desert",
+    theme: "Chaque pas s'enfonce. Chaque bulle qui éclate raconte une fin.",
+    noms: ["Sangsue Géante", "Crapaud Bilieux", "Moustique Obèse", "Tentacule Vaseux", "Feu Putride", "Alligator Vétéran", "Champignon Vénéneux", "Limon Affamé", "Golem de Tourbe", "Hydre Naine", "Matriarche du Bourbier"] },
+  { id: "ruines", nom: "Ruines Anciennes", col: "#d8cfa8", tint: "#9a8a68", src: "ocean",
+    theme: "Une civilisation entière dort ici. Elle a le sommeil léger.",
+    noms: ["Squelette Poussiéreux", "Gargouille Fissurée", "Scarabée Runique", "Spectre Érudit", "Armure Hantée", "Serpent de Pierre", "Scribe Maudit", "Statue Pleureuse", "Golem d'Albâtre", "Sphinx Déchu", "Roi Oublié"] },
+  { id: "citadelle", nom: "Citadelle Astrale", col: "#c59bff", tint: "#7a5ac8", src: "desert",
+    theme: "Une forteresse suspendue entre les étoiles et l'oubli.",
+    noms: ["Sentinelle Astrale", "Chérubin Déchu", "Vitrail Animé", "Astre Mineur", "Templier Spectral", "Comète Naine", "Oracle Aveugle", "Griffon Stellaire", "Golem Céleste", "Séraphin Terni", "Archonte Astral"] },
+  { id: "jungle", nom: "Jungle Primordiale", col: "#45d06a", tint: "#1e8a3e", src: "foret",
+    theme: "La vie à l'état brut. Elle pousse, elle grimpe, elle mord.",
+    noms: ["Panthère Ombreuse", "Perroquet Braillard", "Liane Étrangleuse", "Singe Hurleur", "Grenouille Fluo", "Fourmi Soldate", "Plante Carnivore", "Jaguar Tacheté", "Golem de Lianes", "Basilic Émeraude", "Ancien de la Canopée"] },
+  { id: "abysses", nom: "Abysses", col: "#7a6aff", tint: "#3a2a8a", src: "ocean",
+    theme: "Là où la lumière renonce, autre chose a appris à voir.",
+    noms: ["Poisson-Lanterne", "Ver Aveugle", "Ombre Rampante", "Crabe Colossal", "Anguille Spectrale", "Pieuvre d'Encre", "Horreur Naissante", "Méduse Noire", "Golem Abyssal", "Léviathan Larvaire", "Dévoreur des Profondeurs"] },
+  { id: "verre", nom: "Désert de Verre", col: "#e8f4ff", tint: "#a8c8e8", src: "desert",
+    theme: "Un ancien désert fondu en miroir. Le soleil s'y coupe lui-même.",
+    noms: ["Éclat Dansant", "Scorpion de Verre", "Rose des Sables", "Serpent Prismatique", "Mirage Solide", "Vortex de Silice", "Dune Chantante", "Reflet Hostile", "Golem de Cristal", "Djinn de Quartz", "Prisme Éternel"] },
+  { id: "ciel", nom: "Ciel Fragmenté", col: "#8ad4ff", tint: "#4a8ac8", src: "ocean",
+    theme: "Des îles brisées dérivent dans un ciel sans bas ni haut.",
+    noms: ["Nuage Mordeur", "Îlot Errant", "Zéphyr Sauvage", "Raie des Vents", "Moine Flottant", "Fragment Chanteur", "Aigle de Foudre", "Astre Perdu", "Golem d'Azur", "Roc Millénaire", "Gardien du Firmament"] },
+  { id: "coeur", nom: "Cœur du Monde", col: "#ff5fd0", tint: "#c82a8a", src: "foret",
+    theme: "Le battement originel. Tout ce qui existe en descend.",
+    noms: ["Pulsation", "Écho Errant", "Souvenir Brisé", "Sentinelle du Noyau", "Flamme Originelle", "Racine du Monde", "Larme de Gaïa", "Avatar Mineur", "Golem Primordial", "Aube Dévorante", "Cœur Battant du Monde"] },
+];
+const ZONE_EXT_BY_ID = Object.fromEntries(ZONES_EXT.map((z) => [z.id, z]));
+function fondTeinte(ze) {
+  const n = parseInt(ze.col.slice(1), 16);
+  const c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const sh = (h, k) => teinte(h, "#000000", k), li = (h, k) => teinte(h, "#ffffff", k);
+  return {
+    hb: [Math.min(215, c[0] * 0.72 + 30) | 0, Math.min(215, c[1] * 0.72 + 30) | 0, Math.min(215, c[2] * 0.72 + 30) | 0],
+    hg: [42, 42, 48],
+    blobs: [sh(ze.col, 0.55), sh(ze.col, 0.4), sh(ze.col, 0.25), li(ze.col, 0.12)],
+    tA: sh(ze.tint, 0.45), tB: sh(ze.tint, 0.25), canop: false,
+    solA: sh(ze.col, 0.35), solB: sh(ze.col, 0.42), ch: sh(ze.tint, 0.2), chC: li(ze.tint, 0.12), herbe: sh(ze.col, 0.3),
+    deco: [li(ze.col, 0.5), "#ffffff", ze.tint, li(ze.col, 0.2), "#ffd45e"], ray: 0.12,
+  };
+}
+(function genererZonesExt() {
+  ZONES_EXT.forEach((ze) => {
+    ZONES.push({ id: ze.id, nom: ze.nom, col: ze.col });
+    const srcMons = MONSTRES.filter((m) => m.zone === ze.src);
+    srcMons.forEach((sm, i) => {
+      const nid = ze.id + "_" + i;
+      const base = SPR[sm.spr];
+      const p2 = {}; for (const key in base.p) p2[key] = teinte(base.p[key], ze.tint, 0.45);
+      SPR[nid] = { p: p2, g: base.g };
+      MONSTRES.push({
+        id: nid, zone: ze.id, nom: ze.noms[i], type: sm.type, spr: nid,
+        hpM: sm.hpM, atkM: sm.atkM, asM: sm.asM, goldM: sm.goldM, tiers: sm.tiers.slice(),
+        desc: sm.type === "zone" ? ze.noms[i] + " — le Gardien de " + ze.nom + ". Le vaincre ouvre la suite du continent." : ze.noms[i] + ". " + ze.theme,
+      });
+    });
+    FONDS.push(fondTeinte(ze));
+  });
+  Object.assign(MON_BY_ID, Object.fromEntries(MONSTRES.map((m) => [m.id, m])));
+  Object.assign(ZONE_BY_ID, Object.fromEntries(ZONES.map((z) => [z.id, z])));
+})();
+
+/* ============================================================
+   SERMENTS (v0.9.0) — modificateurs optionnels de cycle.
+   Malus immédiats, bonus + multiplicateur d'Éclats à la Renaissance.
+   Débloqués via la branche Destin (node sermUnlock) sauf mention.
+   ============================================================ */
+const SERMENTS = [
+  { id: "pauvrete", nom: "Serment de Pauvreté", ico: "🕳", desc: "La boutique coûte bien plus cher.",
+    malus: { shopPlus: 60 }, bonus: {}, eclatsM: 1.35, echoRar: 0 },
+  { id: "fragilite", nom: "Serment de Fragilité", ico: "🥀", desc: "PV max réduits, mais l'âme s'aiguise.",
+    malus: { hpMoins: 40 }, bonus: { "gJ.puissance": 30, "gJ.celerite": 30 }, eclatsM: 1.3, echoRar: 0 },
+  { id: "chasseur", nom: "Serment du Chasseur", ico: "🏹", desc: "Les boss rapportent moins, le menu fretin bien plus.",
+    malus: { bossGold: 50 }, bonus: { vsMonP: 25, orMaitrise: 2 }, eclatsM: 1.15, echoRar: 0 },
+  { id: "regicide", nom: "Serment du Régicide", ico: "👑", desc: "Les monstres normaux rapportent moins, les Gardiens deviennent des mines d'or.",
+    malus: { mobGold: 40 }, bonus: { gainGardien: 60, "gJ.domination": 40 }, eclatsM: 1.2, echoRar: 0 },
+  { id: "silence", nom: "Serment du Silence", ico: "🤐", desc: "Les stances se taisent : aucun de leurs bonus ne s'applique.",
+    malus: { stancesOff: 1 }, bonus: {}, eclatsM: 1.5, echoRar: 0 },
+  { id: "vide", nom: "Serment du Vide", ico: "🌑", desc: "L'équipement se fait rare, mais les Échos répondent plus fort.",
+    malus: { dropMoins: 60 }, bonus: {}, eclatsM: 1.2, echoRar: 1 },
+  { id: "cendre", nom: "Serment de Cendre", ico: "🔥", desc: "Les ennemis frappent plus fort. L'Endurance s'en souviendra.",
+    malus: { degatsPlus: 50 }, bonus: { "gJ.endurance": 50 }, eclatsM: 1.3, echoRar: 0 },
+  { id: "exil", nom: "Serment d'Exil", ico: "🚪", desc: "Les zones 1-3 rapportent moins d'or ; les zones 6+ bien davantage.",
+    malus: { exilEarly: 50 }, bonus: { exilLoin: 80 }, eclatsM: 1.25, echoRar: 0 },
+];
+const SERMENT_BY_ID = Object.fromEntries(SERMENTS.map((s) => [s.id, s]));
+const MALUS_NEUTRE = { shopPlus: 0, hpMoins: 0, bossGold: 0, mobGold: 0, mobAtk: 1, stancesOff: 0, dropMoins: 0, degatsPlus: 0, exilEarly: 0 };
+/* Malus agrégés des serments actifs (réduits par le node Destin sermMalus). */
+function malusSerments(meta, sermMalusPct) {
+  const m = { ...MALUS_NEUTRE };
+  const red = 1 - Math.min(0.6, (sermMalusPct || 0) / 100);
+  ((meta.origine && meta.origine.sermentsActifs) || []).forEach((sid) => {
+    const s = SERMENT_BY_ID[sid]; if (!s) return;
+    for (const k in s.malus) {
+      if (k === "stancesOff") m.stancesOff = 1;
+      else m[k] = (m[k] || 0) + s.malus[k] * red;
+    }
+  });
+  m.mobAtk = 1; /* réservé aux futures altérations/serments */
+  return m;
+}
+
+/* ============================================================
+   ZONES ALTÉRÉES (v0.9.0) — variantes plus dures et plus rentables.
+   Débloquées après la 1re Renaissance ou via le node Destin altUnlock.
+   Structure prête pour les zones 6-15.
+   ============================================================ */
+const ALTERATIONS = [
+  { id: "alt_foret", zoneId: "foret", nom: "Forêt Altérée", desc: "La sève noire rend tout plus coriace.",
+    mob: { hp: 2.2, atk: 1.3, as: 1 }, rew: { gold: 1.6, best: 2, gJEndu: 40 } },
+  { id: "alt_desert", zoneId: "desert", nom: "Désert Brûlé", desc: "Le sable fond ; tout y est plus rapide.",
+    mob: { hp: 1.5, atk: 1.4, as: 1.35 }, rew: { gold: 1.7, gJPuis: 30, gJCrit: 30 } },
+  { id: "alt_ocean", zoneId: "ocean", nom: "Océan Abyssal", desc: "Les boss y sont gonflés d'une eau ancienne.",
+    mob: { hp: 1.6, atk: 1.3, as: 1, bossHp: 2.5 }, rew: { gold: 1.6, essence: 100, gJDomi: 40 } },
+  { id: "alt_montagne", zoneId: "montagne", nom: "Montagne Fracturée", desc: "La roche vive blinde les créatures.",
+    mob: { hp: 2.6, atk: 1.25, as: 0.9 }, rew: { gold: 1.5, ferraille: 80 } },
+  { id: "alt_plaines", zoneId: "plaines", nom: "Plaines Déchaînées", desc: "L'orage ne tombe plus : il chasse.",
+    mob: { hp: 1.6, atk: 1.5, as: 1.4 }, rew: { gold: 1.8, gJCele: 40, echoRar: 1 } },
+];
+const ALT_BY_ZONE = Object.fromEntries(ALTERATIONS.map((a) => [a.zoneId, a]));
+const ALT_NEUTRE = { hp: 1, atk: 1, as: 1, gold: 1, bossHp: 0 };
+function altActive(meta, zid) {
+  return !!(meta.origine && meta.origine.altSel && meta.origine.altSel[zid] && ALT_BY_ZONE[zid]);
+}
+function altMods(meta, zid) {
+  if (!altActive(meta, zid)) return ALT_NEUTRE;
+  const a = ALT_BY_ZONE[zid];
+  return { hp: a.mob.hp, atk: a.mob.atk, as: a.mob.as, gold: a.rew.gold, bossHp: a.mob.bossHp || 0 };
+}
 function Fond({ zi }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -2172,9 +2350,10 @@ function TabBestiaire({ G, maj }) {
                 const seuils = m.tiers.map((x) => Math.ceil(x * rm));
                 const Lm = zi * 10 + (zi === G.run.zoneIdx ? G.run.niveau : 1);
                 const bm = m.type === "zone" ? BAL.zbos : m.type === "mini" ? BAL.boss : null;
-                const hp = BAL.mob.hp * Math.pow(BAL.mob.hpG, Lm - 1) * m.hpM * (bm ? bm.hp : 1);
-                const atk = BAL.mob.atk * Math.pow(BAL.mob.atkG, Lm - 1) * m.atkM * (bm ? bm.atk : 1);
-                const gold = BAL.mob.gold * Math.pow(BAL.mob.goldG, Lm - 1) * m.goldM * (bm ? bm.gold : 1);
+                const zsB = zScale(zi);
+                const hp = BAL.mob.hp * Math.pow(BAL.mob.hpG, Lm - 1) * m.hpM * (bm ? bm.hp : 1) * zsB.hp;
+                const atk = BAL.mob.atk * Math.pow(BAL.mob.atkG, Lm - 1) * m.atkM * (bm ? bm.atk : 1) * zsB.atk;
+                const gold = BAL.mob.gold * Math.pow(BAL.mob.goldG, Lm - 1) * m.goldM * (bm ? bm.gold : 1) * zsB.gold;
                 return (
                   <div key={m.id} className="carte bestc">
                     <div className="bestrow">
