@@ -11,8 +11,18 @@ import React, { useState, useEffect, useRef } from "react";
    Convention : 0.X.0 = nouveautés de gameplay, 0.X.Y = corrections.
    À chaque version : ajouter une entrée EN TÊTE de CHANGELOG — la popup
    « Nouveautés » s'affiche automatiquement chez les joueurs concernés. */
-const VERSION = "0.8.5";
+const VERSION = "0.9.0";
 const CHANGELOG = [
+  { v: "0.9.0", date: "8 juillet 2026", titre: "L'Origine — le monde s'agrandit", points: [
+    "Le continent passe à 15 zones : Montagne, Plaines Orageuses, Glacier, Volcan, Marais Putride, Ruines Anciennes, Citadelle Astrale, Jungle Primordiale, Abysses, Désert de Verre, Ciel Fragmenté et le Cœur du Monde — chacune avec ses 11 créatures, son Gardien et son arme de Transcendance.",
+    "Attention : à partir de la zone 5, le monde devient brutal. C'est voulu.",
+    "☀ La Renaissance : le nouveau reset global, au-dessus de la Transcendance. Dès la zone 4, l'onglet Origine apparaît ; dès la zone 5, tu peux dissoudre ton cycle entier contre des ❖ Éclats d'Origine, permanents.",
+    "🌳 L'Arbre d'Origine : 5 branches (Corps, Âme, Mémoire, Héritage, Destin), 150 nodes de bonus permanents à acheter avec tes Éclats.",
+    "🌀 Les Échos : des reliques permanentes à choisir après chaque Renaissance — 7 types, 8 raretés, slots limités. La branche Destin améliore leurs raretés, niveaux et choix.",
+    "🕯 Les Serments : 8 défis optionnels qui durcissent le cycle contre plus d'Éclats et de meilleurs Échos (débloqués via Destin).",
+    "🌗 Les Zones altérées : des variantes plus dangereuses et plus rentables des zones 1 à 5 (après ta première Renaissance).",
+    "Tes anciennes sauvegardes fonctionnent telles quelles. L'équilibrage s'affinera dans les prochaines versions.",
+  ] },
   { v: "0.8.5", date: "7 juillet 2026", titre: "Pièces sonnantes & historique", points: [
     "La bourse affiche de vraies pièces colorées : Cuivre, Argent, Or, Platine, Émeraude, Rubis, Saphir, Diamant — chacune vaut 100 fois la précédente.",
     "Historique des mises à jour consultable dans Paramètres : tout le changelog depuis le début du jeu.",
@@ -1126,14 +1136,18 @@ const ARMES_T = {
 };
 const ROME = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
 const rome = (n) => ROME[n - 1] || "×" + n;
-function statsArmeT(zid, niv) {
+function statsArmeT(zid, niv, meta) {
   const d = ARMES_T[zid]; if (!d || niv < 1) return null;
   const stats = {}; stats[d.main.stat] = d.main.parNiv * niv;
   d.subs.forEach((s) => { stats[s.stat] = (stats[s.stat] || 0) + s.parNiv * niv; });
+  if (meta && meta.origine) {
+    const mArm = 1 + (bonusOrigine(meta).armeT || 0) / 100;
+    if (mArm > 1) for (const k in stats) stats[k] = Math.round(stats[k] * mArm);
+  }
   return stats;
 }
-function genArmeT(zid, niv) {
-  const stats = statsArmeT(zid, niv); if (!stats) return null;
+function genArmeT(zid, niv, meta) {
+  const stats = statsArmeT(zid, niv, meta); if (!stats) return null;
   return { id: uid(), slot: "armeT", rar: "legendaire", ilvl: niv * 10, nom: ARMES_T[zid].nom + " " + rome(niv), stats, nv: true, zone: zid, niv };
 }
 /* L'arme équipée est dérivée : le choix du joueur s'il est valide, sinon la
@@ -1143,7 +1157,7 @@ function armeTEquipee(meta) {
   if (!possedees.length) return null;
   let zid = meta.armeTChoix && possedees.some((z) => z.id === meta.armeTChoix) ? meta.armeTChoix : null;
   if (!zid) zid = possedees.reduce((a, b) => (meta.zones[b.id].trans > meta.zones[a.id].trans ? b : a)).id;
-  return genArmeT(zid, meta.zones[zid].trans);
+  return genArmeT(zid, meta.zones[zid].trans, meta);
 }
 /* ---------- recyclage automatique du butin ---------- */
 function recyclable(meta, it) {
@@ -1232,16 +1246,18 @@ function sfx(type, on) {
 /* ============================================================
    MOTEUR DE JEU (opère sur un objet G mutable, rendu à ~10 fps)
    ============================================================ */
-const reqMult = (meta, zid) => Math.pow(BAL.transReq, (meta.zones[zid] || { trans: 0 }).trans);
+let SEUIL_MAIT_CACHE = 0; /* rempli par heroStats via bonusOrigine ; évite un recalcul par appel */
+const reqMult = (meta, zid) => Math.pow(BAL.transReq, (meta.zones[zid] || { trans: 0 }).trans) * (1 - Math.min(60, SEUIL_MAIT_CACHE) / 100);
 const maxTrans = (meta) => Math.max(...ZONES.map((z) => meta.zones[z.id].trans));
 const tierOf = (def, kills, rm) => def.tiers.reduce((t, req) => t + (kills >= Math.ceil(req * rm) ? 1 : 0), 0);
 const estMaitrise = (def, kills, rm) => tierOf(def, kills, rm) >= def.tiers.length;
 function bestGoldBonus(meta) {
   let b = 0;
+  const orM = meta.origine ? (function () { let s = 0; for (const nid in meta.origine.arbre) { const n = NODE_BY_ID[nid]; if (n && n.eff === "orMaitrise") s += n.val * meta.origine.arbre[nid]; } ((meta.origine.echosEq || [])).forEach((eid) => { const e = (meta.origine.echos || []).find((x) => x.id === eid); if (e) (e.effets || []).forEach((ef) => { if (ef.e === "orMaitrise") s += ef.v; }); }); return s; })() : 0;
   for (const z of ZONES) {
     const rm = reqMult(meta, z.id);
     const n = monstresDe(z.id).reduce((a, m) => a + (estMaitrise(m, meta.best[m.id] || 0, rm) ? 1 : 0), 0);
-    b += n * BAL.bestGold * Math.pow(2, meta.zones[z.id].trans);
+    b += n * (BAL.bestGold + orM) * Math.pow(2, (meta.zones[z.id] || { trans: 0 }).trans);
   }
   return b;
 }
@@ -1265,6 +1281,15 @@ function metaInitiale() {
     ensembles: [],
     grpEns: ["Général"],
     prios: { ordres: [], list: [], actif: null },
+    /* v0.9.0 — permanent à travers les Renaissances */
+    origine: {
+      ren: 0, eclats: 0, eclatsTot: 0, eclatsDep: 0, meilleurGain: 0,
+      bestZone: 0, bestNiv: 0,
+      arbre: {}, echos: [], echosEq: [], echoChoix: null,
+      sermentsActifs: [], altSel: {},
+    },
+    /* v0.9.0 — stats du cycle en cours (remises à zéro par la Renaissance) */
+    cycle: { maxZone: 0, maxNiv: 1, gardiens: {}, kills: 0, bestRar: 0 },
   };
 }
 function runInitiale() {
@@ -1279,25 +1304,34 @@ function runInitiale() {
 
 function heroStats(G) {
   const meta = G.meta, run = G.run;
+  const b = bonusOrigine(meta);
+  const m = malusSerments(meta, b.sermMalus);
+  G.oB = b; G.oM = m;
+  SEUIL_MAIT_CACHE = b.seuilMaitrise;
   const eq = equipTotals(meta);
   const sd = STANCE_BY_ID[run.stance];
   const sv = stanceVals(sd, meta.stances[sd.id]);
   const S = { atk: 0, hp: 0, def: 0, as: 0, critC: 0, critD: 0, gold: 0, vsMon: 0, vsBoss: 0 };
-  if (sd.principal) S[sd.principal.stat] += sv.principal;
-  sv.subs.forEach((s) => { S[s.stat] += s.val; });
+  if (!m.stancesOff) {
+    if (sd.principal) S[sd.principal.stat] += sv.principal;
+    sv.subs.forEach((s) => { S[s.stat] += s.val; });
+  }
   const T = {}; GAUGES.forEach((g) => { T[g.id] = meta.gauges[g.id].applied; });
-  const atk = (BAL.hero.atk + eq.atkF) * (1 + 0.01 * T.puissance) * (1 + 0.05 * run.lvlAtk) * (1 + eq.atkP / 100) * (1 + S.atk / 100);
-  const hpMax = (BAL.hero.hp + eq.hpF) * (1 + 0.01 * T.endurance) * (1 + 0.05 * run.lvlHp) * (1 + eq.hpP / 100) * (1 + S.hp / 100);
-  const defV = Math.max(0, (10 + eq.defF) * (1 + S.def / 100));
+  const nbTrans = ZONES.reduce((a, z) => a + (((meta.zones[z.id] || {}).trans || 0) >= 1 ? 1 : 0), 0);
+  const gGlobal = 1 + (b.statsG + b.parZoneTrans * nbTrans + (run.zoneIdx < 3 ? b.earlyZ : 0)) / 100;
+  b.seuilJActif = GAUGES.reduce((a, g) => a + (meta.gauges[g.id].applied >= 10 ? 1 : 0), 0) >= 3;
+  const atk = (BAL.hero.atk + eq.atkF + b.atkDep + b.atkParGardien * Object.keys((meta.cycle || {}).gardiens || {}).length) * (1 + 0.01 * T.puissance) * (1 + 0.05 * run.lvlAtk * (1 + b.effShop / 100)) * (1 + (eq.atkP + b.atkP) / 100) * (1 + S.atk / 100) * gGlobal;
+  const hpMax = (BAL.hero.hp + eq.hpF + b.hpDep) * (1 + 0.01 * T.endurance) * (1 + 0.05 * run.lvlHp * (1 + b.effShop / 100)) * (1 + (eq.hpP + b.hpP) / 100) * (1 + S.hp / 100) * (1 + (b.statsG + b.parZoneTrans * nbTrans) / 100) * (1 - Math.min(70, m.hpMoins) / 100);
+  const defV = Math.max(0, (10 + eq.defF + b.defDep) * (1 + S.def / 100));
   const red = clamp(defV / (defV + BAL.defK), 0, 0.85);
   return {
     atk, hpMax, def: defV, red,
-    as: BAL.hero.as * (1 + 0.005 * T.celerite) * (1 + eq.asP / 100) * (1 + S.as / 100),
-    critC: clamp(BAL.hero.critC + eq.critC + S.critC, 0, 80),
+    as: BAL.hero.as * (1 + 0.005 * T.celerite) * (1 + (eq.asP + b.asP) / 100) * (1 + S.as / 100),
+    critC: clamp(BAL.hero.critC + eq.critC + S.critC + b.critC, 0, 80),
     critD: BAL.hero.critD + 2 * T.precision + eq.critD + S.critD,
-    gold: (1 + 0.01 * T.fortune) * (1 + eq.goldP / 100) * (1 + bestGoldBonus(meta) / 100) * (1 + S.gold / 100),
-    vsMon: 1 + S.vsMon / 100,
-    vsBoss: (1 + 0.01 * T.domination) * (1 + eq.vsBossP / 100) * (1 + S.vsBoss / 100),
+    gold: (1 + 0.01 * T.fortune) * (1 + (eq.goldP + b.goldP) / 100) * (1 + bestGoldBonus(meta) / 100) * (1 + S.gold / 100),
+    vsMon: (1 + S.vsMon / 100) * (1 + b.vsMonP / 100),
+    vsBoss: (1 + 0.01 * T.domination) * (1 + (eq.vsBossP + b.vsBossP) / 100) * (1 + S.vsBoss / 100),
     gaugeF: 1 + eq.gaugeP / 100,
   };
 }
@@ -1329,7 +1363,20 @@ function creerMonstre(G, zoneIdx, niveau, idx) {
   };
 }
 
-const gAdd = (G, id, v) => { G.meta.gauges[id].total += v; };
+const ALT_GJ = { gJEndu: "endurance", gJPuis: "puissance", gJCrit: "precision", gJDomi: "domination", gJCele: "celerite" };
+const gAdd = (G, id, v) => {
+  const b = G.oB;
+  if (b) {
+    let p = (b.gJ[id] || 0) + (b.gTous || 0) + (b.seuilJActif ? (b.seuilJ || 0) : 0);
+    const zid = ZONES[G.run.zoneIdx] && ZONES[G.run.zoneIdx].id;
+    if (zid && altActive(G.meta, zid)) {
+      const rew = ALT_BY_ZONE[zid].rew;
+      for (const k in ALT_GJ) if (rew[k] && ALT_GJ[k] === id) p += rew[k];
+    }
+    v *= 1 + p / 100;
+  }
+  G.meta.gauges[id].total += v;
+};
 function addFloat(G, txt, cls, side) {
   G.floats.push({ id: uid(), txt, cls, side, x: 8 + R() * 44, t: G.now });
   if (G.floats.length > 24) G.floats.splice(0, G.floats.length - 24);
@@ -1339,18 +1386,22 @@ function log(G, txt, col) { if (!G.log) G.log = []; G.log.push({ id: uid(), txt,
 
 function rollDrop(G, mon) {
   const meta = G.meta;
-  const p = mon.estBoss ? (mon.def.type === "zone" ? BAL.drop.zone : BAL.drop.mini) : BAL.drop.normal;
+  let p = mon.estBoss ? (mon.def.type === "zone" ? BAL.drop.zone : BAL.drop.mini) : BAL.drop.normal;
+  p *= 1 + ((G.oB && G.oB.dropP) || 0) / 100;
+  p *= 1 - Math.min(90, (G.oM && G.oM.dropMoins) || 0) / 100;
   if (R() > p) return;
   const zTrans = meta.zones[ZONES[G.run.zoneIdx].id].trans;
   const slotId = pick(SLOTS.filter((s) => !s.trans)).id;
   const it = genItem(slotId, G.run.zoneIdx * 10 + G.run.niveau + zTrans * 10, mon.def.type === "zone" && R() < 0.35 ? "legendaire" : null);
+  const riCyc = RARS.findIndex((r) => r.id === it.rar);
+  if (riCyc > (meta.cycle.bestRar || 0)) meta.cycle.bestRar = riCyc;
   if (recyclable(meta, it)) {
-    const v = prixFerraille(it); meta.ferraille += v;
+    const v = gainFerraille(G, prixFerraille(it)); meta.ferraille += v;
     log(G, "♻ Recyclé : " + it.nom + " · +" + fmt(v) + " ⚒", "#9aa3c7");
     return;
   }
   if (meta.inv.length >= 60) {
-    const v = prixFerraille(it); meta.ferraille += v;
+    const v = gainFerraille(G, prixFerraille(it)); meta.ferraille += v;
     toast(G, "Inventaire plein — " + it.nom + " recyclé +" + fmt(v) + " ⚒", "#b9c2d9");
   } else { meta.inv.unshift(it); G.dropFlag = true; toast(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); log(G, "Butin : " + it.nom, RAR_BY_ID[it.rar].col); }
   sfx("equip", meta.opts.sfx);
@@ -1358,10 +1409,18 @@ function rollDrop(G, mon) {
 /* La vente d'équipement ne rapporte plus d'or : elle produit des morceaux
    de ferraille ⚒, la monnaie d'affinage. */
 const prixFerraille = (it) => Math.max(1, Math.round(it.ilvl * RAR_BY_ID[it.rar].mult * (1 + 0.5 * ((it.t || 1) - 1) + 0.05 * (it.a || 0))));
+const gainFerraille = (G, v) => Math.round(v * (1 + (((G.oB && G.oB.ferrailleP) || 0) + (altActive(G.meta, ZONES[G.run.zoneIdx].id) ? (ALT_BY_ZONE[ZONES[G.run.zoneIdx].id].rew.ferraille || 0) : 0)) / 100));
 
 function tuerMonstre(G) {
   const run = G.run, meta = G.meta, st = G.st, mon = run.mon;
-  const g = mon.gold * st.gold;
+  const oB = G.oB || {}, oM = G.oM || MALUS_NEUTRE;
+  let g = mon.gold * st.gold;
+  if (mon.estBoss) {
+    if (mon.def.type === "zone") g *= 1 + (oB.gainGardien || 0) / 100;
+    g *= 1 - Math.min(90, oM.bossGold || 0) / 100;
+  } else g *= 1 - Math.min(90, oM.mobGold || 0) / 100;
+  if (run.zoneIdx < 3) g *= 1 - Math.min(90, oM.exilEarly || 0) / 100;
+  if (run.zoneIdx >= 5) g *= 1 + (oB.exilLoin || 0) / 100;
   run.hp = st.hpMax;
   run.gold += g; run.stats.or += g; meta.vie.or += g;
   addFloat(G, "+" + fmtM(g), "gold", "mon");
@@ -1369,6 +1428,9 @@ function tuerMonstre(G) {
   sfx("coin", meta.opts.sfx);
   gAdd(G, "extermination", 1 * st.gaugeF);
   run.stats.kills++; meta.vie.kills++;
+  meta.cycle.kills = (meta.cycle.kills || 0) + 1;
+  meta.cycle.maxZone = Math.max(meta.cycle.maxZone || 0, run.zoneIdx);
+  meta.cycle.maxNiv = Math.max(meta.cycle.maxNiv || 1, run.zoneIdx * 10 + run.niveau);
   const rm = reqMult(meta, mon.def.zone);
   const avant = tierOf(mon.def, meta.best[mon.def.id] || 0, rm);
   meta.best[mon.def.id] = (meta.best[mon.def.id] || 0) + 1;
@@ -1381,15 +1443,22 @@ function tuerMonstre(G) {
   }
   if (mon.estBoss) {
     run.tokensPend++; gAdd(G, "domination", 1 * st.gaugeF);
+    if (R() * 100 < (oB.tokensB || 0)) { run.tokensPend++; log(G, "Trophée royal — token de boss bonus ⬡", "#c59bff"); }
     addFloat(G, "+1 ⬡", "token", "mon");
     log(G, "+1 token de boss ⬡", "#c59bff");
     if (mon.def.type === "zone") {
       const zidB = mon.def.zone;
+      meta.cycle.gardiens[zidB] = Math.max(meta.cycle.gardiens[zidB] || 0, altActive(meta, zidB) ? 2 : 1);
       if (!Array.isArray(run.essences)) run.essences = [];
       if (!run.essences.includes(zidB)) {
-        run.essences.push(zidB); meta.essence++;
-        toast(G, "✦ Essence résiduelle absorbée — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#ff3b5c");
-        log(G, "✦ +1 Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#ff3b5c");
+        run.essences.push(zidB);
+        let chanceDouble = (oB.essenceB || 0) + (altActive(meta, zidB) ? (ALT_BY_ZONE[zidB].rew.essence || 0) : 0);
+        let nEss = 1;
+        while (chanceDouble >= 100) { nEss++; chanceDouble -= 100; }
+        if (R() * 100 < chanceDouble) nEss++;
+        meta.essence += nEss;
+        toast(G, "✦ Essence résiduelle ×" + nEss + " — " + ZONE_BY_ID[zidB].nom + " (1/run)", "#ff3b5c");
+        log(G, "✦ +" + nEss + " Essence résiduelle (" + ZONE_BY_ID[zidB].nom + ")", "#ff3b5c");
         G.saveNow = true;
       }
     }
@@ -1463,8 +1532,10 @@ function tick(G, dt) {
   while (run.hG >= 1 && run.mon && garde++ < 20) {
     run.hG -= 1;
     const crit = R() * 100 < st.critC;
-    const tier = tierOf(run.mon.def, G.meta.best[run.mon.def.id] || 0, reqMult(G.meta, run.mon.def.zone));
+    const rmT = reqMult(G.meta, run.mon.def.zone);
+    const tier = tierOf(run.mon.def, G.meta.best[run.mon.def.id] || 0, rmT);
     let d = st.atk * (crit ? st.critD / 100 : 1) * (run.mon.estBoss ? st.vsBoss : st.vsMon) * (1 + (BAL.bestDmg * tier) / 100);
+    if (G.oB && G.oB.vsMaitrise > 0 && estMaitrise(run.mon.def, G.meta.best[run.mon.def.id] || 0, rmT)) d *= 1 + G.oB.vsMaitrise / 100;
     d = Math.max(1, d);
     run.mon.hp -= d; run.stats.degats += d;
     gAdd(G, "puissance", d * st.gaugeF);
@@ -1482,6 +1553,8 @@ function tick(G, dt) {
     run.mG -= 1;
     const tier = tierOf(run.mon.def, G.meta.best[run.mon.def.id] || 0, reqMult(G.meta, run.mon.def.zone));
     let d = run.mon.atk * (1 - st.red) * (1 - (BAL.bestRes * tier) / 100);
+    if (G.oM && G.oM.degatsPlus > 0) d *= 1 + G.oM.degatsPlus / 100;
+    if (G.oB && G.oB.redSubis > 0) d *= 1 - Math.min(70, G.oB.redSubis) / 100;
     d = Math.max(1, d);
     run.hp -= d; run.stats.subis += d;
     gAdd(G, "endurance", d * st.gaugeF);
@@ -1495,7 +1568,12 @@ function tick(G, dt) {
 /* ---------- actions joueur ---------- */
 const coutShop = (base, g, lvl) => Math.ceil(base * Math.pow(g, lvl));
 const rabaisShop = (meta) => Math.pow(0.99, meta.gauges.extermination ? meta.gauges.extermination.applied : 0);
-const coutReel = (G, quoi) => { const r = G.run; return Math.ceil((quoi === "atk" ? coutShop(BAL.shop.atkC, BAL.shop.atkCG, r.lvlAtk) : coutShop(BAL.shop.hpC, BAL.shop.hpCG, r.lvlHp)) * rabaisShop(G.meta)); };
+const coutReel = (G, quoi) => {
+  const r = G.run;
+  const oB = G.oB || { coutShop: 0 }, oM = G.oM || MALUS_NEUTRE;
+  const modO = (1 - Math.min(60, oB.coutShop) / 100) * (1 + (oM.shopPlus || 0) / 100);
+  return Math.ceil((quoi === "atk" ? coutShop(BAL.shop.atkC, BAL.shop.atkCG, r.lvlAtk) : coutShop(BAL.shop.hpC, BAL.shop.hpCG, r.lvlHp)) * rabaisShop(G.meta) * modO);
+};
 function acheter(G, quoi, max) {
   const run = G.run; if (run.over) return;
   let n = 0;
@@ -1529,7 +1607,7 @@ function vendreItem(G, itemId) {
   const meta = G.meta;
   const i = meta.inv.findIndex((x) => x.id === itemId); if (i < 0) return;
   if (verrou(meta, meta.inv[i])) { toast(G, "Équipement verrouillé — déverrouille-le d'abord", "#ffd45e"); return; }
-  const v = prixFerraille(meta.inv[i]);
+  const v = gainFerraille(G, prixFerraille(meta.inv[i]));
   meta.ferraille += v;
   meta.inv.splice(i, 1);
   toast(G, "+" + fmt(v) + " ⚒ ferraille", "#b9c2d9");
@@ -1538,6 +1616,7 @@ function vendreItem(G, itemId) {
 function vendreRarete(G, rarId) {
   const meta = G.meta; let tot = 0, n = 0;
   meta.inv = meta.inv.filter((it) => { if (it.rar === rarId && !verrou(meta, it)) { tot += prixFerraille(it); n++; return false; } return true; });
+  tot = gainFerraille(G, tot);
   if (tot > 0) { meta.ferraille += tot; toast(G, n + " objet" + (n > 1 ? "s" : "") + " " + RAR_BY_ID[rarId].nom.toLowerCase() + (n > 1 ? "s" : "") + " → +" + fmt(tot) + " ⚒", RAR_BY_ID[rarId].col); sfx("coin", meta.opts.sfx); G.saveNow = true; }
 }
 function ameliorerStance(G, id) {
@@ -1569,6 +1648,78 @@ function transcender(G, zid) {
   }
   sfx("boss", meta.opts.sfx); G.saveNow = true;
 }
+/* ============================================================
+   RENAISSANCE (v0.9.0) — le reset global, au-dessus de la Transcendance.
+   ============================================================ */
+const renaissanceVisible = (meta) => ((meta.cycle && (meta.cycle.maxZone || 0) >= 3) || (meta.origine && meta.origine.ren > 0));
+const renaissanceDispo = (meta) => !!(meta.cycle && ((meta.cycle.maxZone || 0) >= 4 || meta.cycle.gardiens[ZONES[3].id]));
+/* Calcule les Éclats d'Origine du cycle en cours, avec détail des sources. */
+function calcEclats(G) {
+  const meta = G.meta, cy = meta.cycle, o = meta.origine;
+  const det = [];
+  const add = (nom, v) => { v = Math.floor(v); if (v > 0) det.push([nom, v]); return Math.max(0, v); };
+  let t = 0;
+  const mz = (cy.maxZone || 0) + 1;
+  t += add("Zones atteintes (" + mz + ")", mz * mz * 2);
+  t += add("Niveau global max (" + (cy.maxNiv || 1) + ")", (cy.maxNiv || 1) * 0.8);
+  const gd = Object.values(cy.gardiens || {});
+  t += add("Gardiens vaincus (" + gd.length + ")", gd.reduce((a, b) => a + (b >= 2 ? 9 : 6), 0));
+  const zt = ZONES.filter((z) => ((meta.zones[z.id] || {}).trans || 0) >= 1).length;
+  const st = ZONES.reduce((a, z) => a + ((meta.zones[z.id] || {}).trans || 0), 0);
+  t += add("Zones transcendées (" + zt + ")", zt * 10 + st * 5);
+  let mait = 0, tiersTot = 0;
+  MONSTRES.forEach((m) => { const k = meta.best[m.id] || 0; const r = reqMult(meta, m.zone); tiersTot += tierOf(m, k, r); if (estMaitrise(m, k, r)) mait++; });
+  t += add("Monstres maîtrisés (" + mait + ")", mait * 2);
+  t += add("Bestiaire (paliers)", tiersTot / 5);
+  t += add("Armes de Transcendance", st * 4);
+  t += add("Meilleure rareté trouvée", (cy.bestRar || 0) * (cy.bestRar || 0));
+  let eqScore = 0; for (const k in meta.equip) if (meta.equip[k]) eqScore += scoreItem(meta.equip[k]);
+  t += add("Puissance d'équipement", Math.sqrt(eqScore) / 4);
+  t += add("Monstres tués (" + fmt(cy.kills || 0) + ")", Math.sqrt(cy.kills || 0));
+  let mult = 1;
+  (o.sermentsActifs || []).forEach((sid) => { const s = SERMENT_BY_ID[sid]; if (s) mult *= s.eclatsM; });
+  const b = bonusOrigine(meta);
+  mult *= 1 + (b.eclatsP || 0) / 100;
+  return { total: Math.floor(t * mult), det, mult: Math.round(mult * 100) / 100, brut: Math.floor(t) };
+}
+function performRenaissance(G) {
+  const meta = G.meta, o = meta.origine;
+  if (!renaissanceDispo(meta)) return;
+  const calc = calcEclats(G);
+  const b = bonusOrigine(meta);
+  o.bestZone = Math.max(o.bestZone || 0, (meta.cycle.maxZone || 0) + 1);
+  o.bestNiv = Math.max(o.bestNiv || 0, meta.cycle.maxNiv || 0);
+  o.meilleurGain = Math.max(o.meilleurGain || 0, calc.total);
+  o.ren++;
+  o.eclats += calc.total; o.eclatsTot += calc.total;
+  /* — reset du cycle — */
+  GAUGES.forEach((g) => {
+    const gs = meta.gauges[g.id];
+    const garde = Math.min(0.5, (b.gardeJauges || 0) / 100);
+    gs.total = Math.floor(gs.total * garde);
+    gs.applied = tiersFromTotal(g, gs.total);
+  });
+  meta.tokens = 0;
+  for (const k in meta.stances) { meta.stances[k].niv = 1; meta.stances[k].evo = 0; }
+  for (const k in meta.best) meta.best[k] = 0;
+  if ((b.killsVirt || 0) > 0) MONSTRES.forEach((m) => { meta.best[m.id] = Math.floor(b.killsVirt); });
+  ZONES.forEach((z) => { meta.zones[z.id].trans = 0; });
+  for (const k in meta.equip) meta.equip[k] = null;
+  meta.inv = [];
+  meta.ensembles = [];
+  meta.ferraille = 0;
+  meta.essence = 0;
+  meta.armeTChoix = null;
+  meta.cycle = { maxZone: 0, maxNiv: 1, gardiens: {}, kills: 0, bestRar: 0 };
+  o.echoChoix = generateEchoOptions(meta);
+  G.run = runInitiale();
+  G.floats = []; G.log = [];
+  toast(G, "☀ RENAISSANCE " + o.ren + " — +" + fmt(calc.total) + " ❖ Éclats d'Origine", "#ffe08a");
+  log(G, "Le monde se reforme. Renaissance n°" + o.ren + " · +" + fmt(calc.total) + " ❖", "#ffe08a");
+  sfx("boss", meta.opts.sfx);
+  G.saveNow = true;
+}
+
 function choisirArmeT(G, zid) {
   const meta = G.meta;
   if (!ARMES_T[zid] || (meta.zones[zid] || {}).trans < 1) return;
@@ -1630,6 +1781,19 @@ function depuisSave(d) {
       meta.prios.list = Array.isArray(d.meta.prios.list) ? d.meta.prios.list : [];
       meta.prios.actif = d.meta.prios.actif || null;
     }
+    /* v0.9.0 — migration Origine/cycle, tolérante aux vieilles saves */
+    if (d.meta.origine) {
+      const o = d.meta.origine;
+      ["ren", "eclats", "eclatsTot", "eclatsDep", "meilleurGain", "bestZone", "bestNiv"].forEach((k) => { if (typeof o[k] === "number") meta.origine[k] = o[k]; });
+      if (o.arbre && typeof o.arbre === "object") meta.origine.arbre = o.arbre;
+      if (Array.isArray(o.echos)) meta.origine.echos = o.echos;
+      if (Array.isArray(o.echosEq)) meta.origine.echosEq = o.echosEq;
+      if (Array.isArray(o.echoChoix)) meta.origine.echoChoix = o.echoChoix;
+      if (Array.isArray(o.sermentsActifs)) meta.origine.sermentsActifs = o.sermentsActifs;
+      if (o.altSel && typeof o.altSel === "object") meta.origine.altSel = o.altSel;
+    }
+    if (d.meta.cycle && typeof d.meta.cycle === "object") Object.assign(meta.cycle, d.meta.cycle);
+    if (!meta.cycle.gardiens || typeof meta.cycle.gardiens !== "object") meta.cycle.gardiens = {};
     /* v0.5.0 : les armes de Transcendance ne sont plus des drops — on purge
        les anciennes de l'inventaire, l'arme équipée est re-dérivée plus bas. */
     meta.inv = meta.inv.filter((it) => it.slot !== "armeT");
@@ -1637,6 +1801,8 @@ function depuisSave(d) {
     for (const k in meta.equip) if (meta.equip[k]) mx = Math.max(mx, typeof meta.equip[k].id === "number" ? meta.equip[k].id : 0);
     meta.ensembles.forEach((e) => { mx = Math.max(mx, typeof e.id === "number" ? e.id : 0); });
     meta.prios.list.forEach((p) => { mx = Math.max(mx, typeof p.id === "number" ? p.id : 0); });
+    meta.origine.echos.forEach((e) => { mx = Math.max(mx, typeof e.id === "number" ? e.id : 0); });
+    (meta.origine.echoChoix || []).forEach((e) => { mx = Math.max(mx, typeof e.id === "number" ? e.id : 0); });
     UID = mx + 1;
     meta.equip.armeT = armeTEquipee(meta);
   }
@@ -1862,10 +2028,299 @@ const ALT_NEUTRE = { hp: 1, atk: 1, as: 1, gold: 1, bossHp: 0 };
 function altActive(meta, zid) {
   return !!(meta.origine && meta.origine.altSel && meta.origine.altSel[zid] && ALT_BY_ZONE[zid]);
 }
+const altsDebloquees = (meta) => !!((meta.origine && meta.origine.ren >= 1) || bonusOrigine(meta).altUnlock > 0);
+function basculerAlt(G, zid) {
+  const meta = G.meta;
+  if (!altsDebloquees(meta) || !ALT_BY_ZONE[zid]) return;
+  meta.origine.altSel[zid] = !meta.origine.altSel[zid];
+  const a = ALT_BY_ZONE[zid];
+  toast(G, meta.origine.altSel[zid] ? a.nom + " activée — danger et récompenses accrus" : ZONE_BY_ID[zid].nom + " revient à la normale", meta.origine.altSel[zid] ? "#ff6b6b" : "#ccd6f4");
+  sfx("equip", meta.opts.sfx); G.saveNow = true;
+}
+const sermentsDebloques = (meta) => bonusOrigine(meta).sermUnlock > 0;
+const sermentsMax = (meta) => 2 + Math.min(3, Math.floor(bonusOrigine(meta).sermMax || 0));
+function basculerSerment(G, sid) {
+  const o = G.meta.origine;
+  if (!sermentsDebloques(G.meta)) { toast(G, "Les Serments se débloquent via la branche Destin de l'Arbre d'Origine", "#ff5fd0"); return; }
+  if (o.sermentsActifs.includes(sid)) {
+    o.sermentsActifs = o.sermentsActifs.filter((x) => x !== sid);
+    toast(G, SERMENT_BY_ID[sid].nom + " rompu", "#ccd6f4");
+  } else {
+    if (o.sermentsActifs.length >= sermentsMax(G.meta)) { toast(G, "Maximum de " + sermentsMax(G.meta) + " Serments actifs", "#ffd45e"); return; }
+    o.sermentsActifs.push(sid);
+    toast(G, "⚠ " + SERMENT_BY_ID[sid].nom + " prêté — le cycle sera plus dur, la Renaissance plus riche", "#ff6b6b");
+  }
+  sfx("boss", G.meta.opts.sfx); G.saveNow = true;
+}
 function altMods(meta, zid) {
   if (!altActive(meta, zid)) return ALT_NEUTRE;
   const a = ALT_BY_ZONE[zid];
   return { hp: a.mob.hp, atk: a.mob.atk, as: a.mob.as, gold: a.rew.gold, bossHp: a.mob.bossHp || 0 };
+}
+
+/* ============================================================
+   ARBRE D'ORIGINE (v0.9.0) — 5 branches × 30 nodes, data-driven.
+   Chaque node : [nom, description, effet, valeur/rang, rangs max, palier 0-3].
+   Chaîne linéaire par branche (le node précédent est le prérequis).
+   ============================================================ */
+const BRANCHES = [
+  { id: "corps", nom: "Corps", ico: "💪", col: "#ff9d5c", theme: "Accélérer chaque début de cycle." },
+  { id: "ame", nom: "Âme", ico: "🔮", col: "#c59bff", theme: "Nourrir les jauges méta." },
+  { id: "memoire", nom: "Mémoire", ico: "📖", col: "#6ad4ff", theme: "Bestiaire, maîtrise et zones." },
+  { id: "heritage", nom: "Héritage", ico: "⚔", col: "#ffd45e", theme: "Transcendance et armes légendaires." },
+  { id: "destin", nom: "Destin", ico: "✨", col: "#ff5fd0", theme: "Échos, Serments et règles du endgame." },
+];
+const NODE_COUT_T = [12, 45, 180, 520];
+/* [nom, desc, effet, val/rang, max, palier] */
+const NODES_DEF = {
+  corps: [
+    ["Vigueur", "+{v} ATQ de départ", "atkDep", 3, 5, 0], ["Robustesse", "+{v} PV de départ", "hpDep", 25, 5, 0],
+    ["Carapace", "+{v} DÉF de départ", "defDep", 2, 5, 0], ["Réflexes", "+{v}% vitesse d'attaque", "asP", 2, 5, 0],
+    ["Marchandage", "−{v}% coût boutique", "coutShop", 2, 5, 0], ["Poigne", "+{v} ATQ de départ", "atkDep", 8, 3, 0],
+    ["Souffle", "+{v} PV de départ", "hpDep", 60, 3, 0], ["Économie", "−{v}% coût boutique", "coutShop", 3, 3, 0],
+    ["Entraînement", "+{v}% efficacité des achats boutique", "effShop", 5, 3, 0], ["Célérité mineure", "+{v}% vitesse d'attaque", "asP", 3, 3, 0],
+    ["Force ancrée", "+{v} ATQ de départ", "atkDep", 25, 4, 1], ["Sang de titan", "+{v} PV de départ", "hpDep", 180, 4, 1],
+    ["Peau de pierre", "+{v} DÉF de départ", "defDep", 8, 4, 1], ["Frénésie", "+{v}% vitesse d'attaque", "asP", 4, 4, 1],
+    ["Négociant", "−{v}% coût boutique", "coutShop", 4, 3, 1], ["Maître d'armes", "+{v}% efficacité des achats boutique", "effShop", 10, 3, 1],
+    ["Conditionnement", "+{v}% ATQ et PV globaux", "statsG", 3, 4, 1], ["Éveil", "+{v}% ATQ et PV globaux", "statsG", 5, 2, 1],
+    ["Chasseur d'aube", "+{v}% dégâts dans les zones 1-3", "earlyZ", 15, 3, 1], ["Pas de géant", "+{v}% dégâts dans les zones 1-3", "earlyZ", 25, 2, 1],
+    ["Colosse", "+{v}% ATQ et PV globaux", "statsG", 8, 3, 2], ["Arsenal inné", "+{v} ATQ de départ", "atkDep", 120, 3, 2],
+    ["Rempart intérieur", "+{v} PV de départ", "hpDep", 800, 3, 2], ["Impulsion", "+{v}% vitesse d'attaque", "asP", 8, 2, 2],
+    ["Marché noir", "−{v}% coût boutique", "coutShop", 8, 2, 2],
+    ["Titan", "+{v}% ATQ et PV globaux", "statsG", 15, 3, 3], ["Héros-né", "+{v} ATQ de départ", "atkDep", 600, 3, 3],
+    ["Immortel précoce", "+{v} PV de départ", "hpDep", 4000, 3, 3], ["Tempête", "+{v}% vitesse d'attaque", "asP", 15, 2, 3],
+    ["Seigneur marchand", "−{v}% coût boutique", "coutShop", 12, 1, 3],
+  ],
+  ame: [
+    ["Braise", "+{v}% gain de Puissance", "gJ.puissance", 5, 5, 0], ["Cuirasse", "+{v}% gain d'Endurance", "gJ.endurance", 5, 5, 0],
+    ["Pactole", "+{v}% gain de Fortune", "gJ.fortune", 5, 5, 0], ["Zéphyr intérieur", "+{v}% gain de Célérité", "gJ.celerite", 5, 5, 0],
+    ["Œil aiguisé", "+{v}% gain de Critique", "gJ.precision", 5, 5, 0], ["Poigne royale", "+{v}% gain de Domination", "gJ.domination", 5, 5, 0],
+    ["Faucheuse", "+{v}% gain d'Extermination", "gJ.extermination", 5, 5, 0], ["Flux", "+{v}% gain de toutes les jauges", "gTous", 2, 3, 0],
+    ["Ancrage", "conserve {v}% des jauges à la Renaissance", "gardeJauges", 3, 4, 0], ["Persistance", "conserve {v}% des jauges à la Renaissance", "gardeJauges", 5, 2, 0],
+    ["Braise ardente", "+{v}% gain de Puissance", "gJ.puissance", 12, 4, 1], ["Cuirasse épaisse", "+{v}% gain d'Endurance", "gJ.endurance", 12, 4, 1],
+    ["Trésorerie", "+{v}% gain de Fortune", "gJ.fortune", 12, 4, 1], ["Bourrasque", "+{v}% gain de Célérité", "gJ.celerite", 12, 4, 1],
+    ["Œil du faucon", "+{v}% gain de Critique", "gJ.precision", 12, 4, 1], ["Sceptre", "+{v}% gain de Domination", "gJ.domination", 12, 4, 1],
+    ["Grande faux", "+{v}% gain d'Extermination", "gJ.extermination", 12, 4, 1], ["Flux majeur", "+{v}% gain de toutes les jauges", "gTous", 5, 3, 1],
+    ["Résonance", "+{v}% jauges si 3 jauges ont atteint le palier 10", "seuilJ", 10, 2, 1], ["Torrent", "+{v}% gain de toutes les jauges", "gTous", 8, 1, 1],
+    ["Éveil de l'âme", "+{v}% gain de toutes les jauges", "gTous", 12, 2, 2], ["Mémoire des jauges", "conserve {v}% des jauges à la Renaissance", "gardeJauges", 10, 2, 2],
+    ["Résonance profonde", "+{v}% jauges si 3 jauges ont atteint le palier 10", "seuilJ", 20, 1, 2], ["Fortune de l'âme", "+{v}% gain de Fortune", "gJ.fortune", 30, 2, 2],
+    ["Fureur de l'âme", "+{v}% gain de Puissance", "gJ.puissance", 30, 2, 2],
+    ["Transcendance intérieure", "+{v}% gain de toutes les jauges", "gTous", 20, 2, 3], ["Continuité", "conserve {v}% des jauges à la Renaissance", "gardeJauges", 15, 1, 3],
+    ["Harmonie", "+{v}% jauges si 3 jauges ont atteint le palier 10", "seuilJ", 35, 1, 3], ["Omniflux", "+{v}% gain de toutes les jauges", "gTous", 30, 1, 3],
+    ["Âme éternelle", "conserve {v}% des jauges à la Renaissance", "gardeJauges", 20, 1, 3],
+  ],
+  memoire: [
+    ["Souvenirs", "−{v}% seuils de maîtrise du bestiaire", "seuilMaitrise", 2, 5, 0], ["Instinct", "{v} kill(s) virtuels sur chaque monstre après Renaissance", "killsVirt", 1, 5, 0],
+    ["Traqueur", "+{v}% d'or par monstre maîtrisé", "orMaitrise", 1, 5, 0], ["Prédateur", "+{v}% dégâts contre les monstres maîtrisés", "vsMaitrise", 3, 5, 0],
+    ["Cartographe", "+{v}% dégâts contre les monstres normaux", "vsMonP", 2, 5, 0], ["Archives", "−{v}% seuils de maîtrise du bestiaire", "seuilMaitrise", 3, 3, 0],
+    ["Réminiscence", "{v} kills virtuels après Renaissance", "killsVirt", 2, 3, 0], ["Butin familier", "+{v}% d'or par monstre maîtrisé", "orMaitrise", 2, 3, 0],
+    ["Faiblesse connue", "+{v}% dégâts contre les monstres maîtrisés", "vsMaitrise", 5, 3, 0], ["Éclaireur", "+{v}% dégâts contre les monstres normaux", "vsMonP", 3, 3, 0],
+    ["Mémoire vive", "−{v}% seuils de maîtrise", "seuilMaitrise", 4, 3, 1], ["Déjà-vu", "{v} kills virtuels après Renaissance", "killsVirt", 5, 3, 1],
+    ["Collection", "+{v}% d'or par monstre maîtrisé", "orMaitrise", 3, 3, 1], ["Exécution", "+{v}% dégâts contre les maîtrisés", "vsMaitrise", 8, 3, 1],
+    ["Vétéran", "+{v}% dégâts contre les monstres normaux", "vsMonP", 5, 3, 1], ["Sentier balisé", "+{v}% dégâts zones 1-3", "earlyZ", 20, 2, 1],
+    ["Albums de chasse", "+{v}% d'or par monstre maîtrisé", "orMaitrise", 4, 2, 1], ["Terres connues", "+{v}% d'or dans les zones altérées", "altGold", 15, 2, 1],
+    ["Rituel du retour", "{v} kills virtuels après Renaissance", "killsVirt", 8, 2, 1], ["Encyclopédie", "−{v}% seuils de maîtrise", "seuilMaitrise", 6, 2, 1],
+    ["Omniscience mineure", "−{v}% seuils de maîtrise", "seuilMaitrise", 8, 2, 2], ["Réincarnation savante", "{v} kills virtuels après Renaissance", "killsVirt", 15, 2, 2],
+    ["Trophées", "+{v}% d'or par monstre maîtrisé", "orMaitrise", 6, 2, 2], ["Chasseur parfait", "+{v}% dégâts contre les maîtrisés", "vsMaitrise", 15, 2, 2],
+    ["Terres altérées", "+{v}% d'or dans les zones altérées", "altGold", 30, 2, 2],
+    ["Mémoire du monde", "−{v}% seuils de maîtrise", "seuilMaitrise", 12, 1, 3], ["Vies antérieures", "{v} kills virtuels après Renaissance", "killsVirt", 40, 1, 3],
+    ["Fortune du savant", "+{v}% d'or par monstre maîtrisé", "orMaitrise", 10, 1, 3], ["Némésis", "+{v}% dégâts contre les maîtrisés", "vsMaitrise", 25, 1, 3],
+    ["Maître des variantes", "+{v}% d'or dans les zones altérées", "altGold", 50, 1, 3],
+  ],
+  heritage: [
+    ["Écho des lames", "+{v}% stats des armes de Transcendance", "armeT", 4, 5, 0], ["Legs", "+{v}% stats des armes de Transcendance", "armeT", 6, 3, 0],
+    ["Offrande", "+{v}% chance d'essence résiduelle double", "essenceB", 4, 5, 0], ["Tribut", "+{v}% récompenses des Gardiens", "gainGardien", 4, 5, 0],
+    ["Trophée royal", "+{v}% chance d'un token de boss bonus", "tokensB", 5, 5, 0], ["Forge ancienne", "+{v}% ferraille", "ferrailleP", 4, 5, 0],
+    ["Récupération", "+{v}% ferraille", "ferrailleP", 6, 3, 0], ["Sang des gardiens", "+{v}% récompenses des Gardiens", "gainGardien", 6, 3, 0],
+    ["Résidu", "+{v}% chance d'essence double", "essenceB", 6, 3, 0], ["Armurier", "+{v}% stats des armes de Transcendance", "armeT", 8, 2, 0],
+    ["Héritage vif", "+{v}% stats des armes de Transcendance", "armeT", 12, 3, 1], ["Pacte des zones", "+{v}% ATQ/PV par zone transcendée", "parZoneTrans", 2, 4, 1],
+    ["Moisson d'essence", "+{v}% chance d'essence double", "essenceB", 10, 2, 1], ["Chasseur de rois", "+{v}% récompenses des Gardiens", "gainGardien", 10, 3, 1],
+    ["Couronne", "+{v}% chance de token bonus", "tokensB", 10, 3, 1], ["Forge du legs", "+{v}% ferraille", "ferrailleP", 10, 3, 1],
+    ["Signature", "+{v}% stats des armes de Transcendance", "armeT", 15, 2, 1], ["Semence de transcendance", "+{v}% ATQ/PV par zone transcendée", "parZoneTrans", 3, 2, 1],
+    ["Saignée", "+{v}% récompenses des Gardiens", "gainGardien", 15, 2, 1], ["Double tribut", "+{v}% chance d'essence double", "essenceB", 15, 1, 1],
+    ["Reliquat", "+{v}% stats des armes de Transcendance", "armeT", 25, 2, 2], ["Monde gravé", "+{v}% ATQ/PV par zone transcendée", "parZoneTrans", 5, 2, 2],
+    ["Sève originelle", "+{v}% chance d'essence double", "essenceB", 25, 1, 2], ["Régicide né", "+{v}% récompenses des Gardiens", "gainGardien", 25, 2, 2],
+    ["Diadème", "+{v}% chance de token bonus", "tokensB", 20, 2, 2],
+    ["Arme éternelle", "+{v}% stats des armes de Transcendance", "armeT", 50, 1, 3], ["Continent intérieur", "+{v}% ATQ/PV par zone transcendée", "parZoneTrans", 8, 1, 3],
+    ["Source d'essence", "+{v}% chance d'essence double", "essenceB", 40, 1, 3], ["Tombeur de gardiens", "+{v}% récompenses des Gardiens", "gainGardien", 50, 1, 3],
+    ["Trésor des rois", "+{v}% chance de token bonus", "tokensB", 40, 1, 3],
+  ],
+  destin: [
+    ["Regard du destin", "+{v} au tirage de rareté des Échos", "echoRarPts", 2, 5, 0], ["Écho murmuré", "+{v} niveau moyen des Échos", "echoNiv", 1, 5, 0],
+    ["Étoile mineure", "+{v}% d'Éclats d'Origine", "eclatsP", 2, 5, 0], ["Aube magique", "+{v} au tirage (Écho Magique ou mieux)", "echoRarPts", 4, 2, 0],
+    ["Main du destin", "+{v}% d'Éclats d'Origine", "eclatsP", 3, 3, 0], ["Serment scellé", "débloque les Serments", "sermUnlock", 1, 1, 0],
+    ["Rite d'altération", "débloque les Zones altérées", "altUnlock", 1, 1, 0], ["Souffle du néant", "+{v} niveau moyen des Échos", "echoNiv", 2, 3, 0],
+    ["Deuxième regard", "+{v} choix d'Écho proposé après Renaissance", "echoChoix", 1, 1, 0], ["Petite étoile", "+{v}% d'Éclats d'Origine", "eclatsP", 4, 2, 0],
+    ["Chemin rare", "+{v} au tirage (Écho Rare ou mieux)", "echoRarPts", 6, 2, 1], ["Geste héroïque", "+{v} au tirage (Écho Héroïque ou mieux)", "echoRarPts", 8, 2, 1],
+    ["Réceptacle", "+{v} slot d'Écho équipé", "echoSlots", 1, 1, 1], ["Volonté double", "+{v} Serment actif maximum", "sermMax", 1, 1, 1],
+    ["Pacte adouci", "−{v}% malus des Serments", "sermMalus", 10, 3, 1], ["Pacte enrichi", "+{v}% bonus des Serments", "sermBonus", 10, 3, 1],
+    ["Constellation", "+{v}% d'Éclats d'Origine", "eclatsP", 6, 3, 1], ["Écho affûté", "+{v} niveau moyen des Échos", "echoNiv", 3, 2, 1],
+    ["Troisième regard", "+{v} choix d'Écho après Renaissance", "echoChoix", 1, 1, 1], ["Étoile filante", "+{v}% d'Éclats d'Origine", "eclatsP", 8, 2, 1],
+    ["Élan épique", "+{v} au tirage (Écho Épique ou mieux)", "echoRarPts", 12, 2, 2], ["Second réceptacle", "+{v} slot d'Écho équipé", "echoSlots", 1, 1, 2],
+    ["Volonté triple", "+{v} Serment actif maximum", "sermMax", 1, 1, 2], ["Pacte du vide", "+{v}% bonus des Serments", "sermBonus", 20, 2, 2],
+    ["Supernova", "+{v}% d'Éclats d'Origine", "eclatsP", 12, 2, 2],
+    ["Étincelle légendaire", "{v}% de chance qu'un Écho soit Légendaire ou mieux", "echoLeg", 3, 2, 3], ["Réceptacle ultime", "+{v} slot d'Écho équipé", "echoSlots", 1, 1, 3],
+    ["Quatrième regard", "+{v} choix d'Écho après Renaissance", "echoChoix", 1, 1, 3], ["Serment-roi", "+{v} Serment actif maximum", "sermMax", 1, 1, 3],
+    ["Cœur stellaire", "+{v}% d'Éclats d'Origine", "eclatsP", 20, 1, 3],
+  ],
+};
+const NODES = [];
+BRANCHES.forEach((br) => {
+  let prev = null, posT = [0, 0, 0, 0];
+  (NODES_DEF[br.id] || []).forEach((df, i) => {
+    const [nom, desc, eff, val, max, tier] = df;
+    const id = br.id + "_" + i;
+    NODES.push({ id, br: br.id, nom, desc, eff, val, max, tier, req: prev, cout: Math.ceil(NODE_COUT_T[tier] * (1 + posT[tier] * 0.18)) });
+    posT[tier]++;
+    prev = id;
+  });
+});
+const NODE_BY_ID = Object.fromEntries(NODES.map((n) => [n.id, n]));
+const coutNode = (n, rang) => Math.ceil(n.cout * Math.pow(1.55, rang));
+function acheterNode(G, nid) {
+  const meta = G.meta, o = meta.origine, n = NODE_BY_ID[nid]; if (!n) return;
+  const rang = o.arbre[nid] || 0;
+  if (rang >= n.max) return;
+  if (n.req && !(o.arbre[n.req] > 0)) { toast(G, "Node précédent requis", "#ffd45e"); return; }
+  const c = coutNode(n, rang);
+  if (o.eclats < c) { toast(G, "Pas assez d'Éclats d'Origine (" + c + " ❖)", "#ff6b6b"); return; }
+  o.eclats -= c; o.eclatsDep += c;
+  o.arbre[nid] = rang + 1;
+  toast(G, "❖ " + n.nom + (n.max > 1 ? " " + (rang + 1) + "/" + n.max : "") + " acquis", "#ffe08a");
+  sfx("tier", meta.opts.sfx); G.saveNow = true;
+}
+/* ============================================================
+   ÉCHOS (v0.9.0) — objets méta permanents, séparés de l'équipement.
+   Choisis après chaque Renaissance, équipés dans des slots limités.
+   ============================================================ */
+const ECHO_LIB = {
+  atkDep: "ATQ de départ", hpDep: "PV de départ", defDep: "DÉF de départ", asP: "% vitesse d'attaque",
+  "gJ.puissance": "% gain de Puissance", "gJ.endurance": "% gain d'Endurance", "gJ.fortune": "% gain de Fortune",
+  "gJ.celerite": "% gain de Célérité", "gJ.precision": "% gain de Critique", "gJ.domination": "% gain de Domination",
+  "gJ.extermination": "% gain d'Extermination", gTous: "% gain de toutes les jauges",
+  vsBossP: "% dégâts boss", vsMonP: "% dégâts monstres", atkParGardien: "ATQ par Gardien vaincu (cycle)",
+  redSubis: "% dégâts subis en moins", hpP: "% PV max", goldP: "% or", dropP: "% chance de butin",
+  ferrailleP: "% ferraille", orMaitrise: "% or par monstre maîtrisé", seuilMaitrise: "% seuils de maîtrise en moins",
+  killsVirt: "kills virtuels après Renaissance", vsMaitrise: "% dégâts contre maîtrisés", altGold: "% or en zones altérées",
+  tokensB: "% chance de token bonus", essenceB: "% chance d'essence double", gainGardien: "% récompenses des Gardiens",
+  eclatsP: "% Éclats d'Origine", critC: "% chance critique", coutShop: "% réduction coût boutique",
+};
+const ECHO_TYPES = [
+  { id: "puissance", nom: "Puissance", ico: "⚔", col: "#ff9d5c", pool: [["atkDep", 8, 1.2], ["gJ.puissance", 6, 0.8], ["vsBossP", 4, 0.5], ["vsMonP", 4, 0.5], ["atkParGardien", 2, 0.5]] },
+  { id: "endurance", nom: "Endurance", ico: "♥", col: "#ff6b6b", pool: [["hpDep", 40, 7], ["defDep", 2, 0.35], ["gJ.endurance", 6, 0.8], ["redSubis", 2, 0.3], ["hpP", 3, 0.4]] },
+  { id: "fortune", nom: "Fortune", ico: "◆", col: "#ffd45e", pool: [["goldP", 5, 0.7], ["dropP", 4, 0.6], ["ferrailleP", 5, 0.7], ["gJ.fortune", 6, 0.8], ["orMaitrise", 1, 0.25]] },
+  { id: "memoire", nom: "Mémoire", ico: "📖", col: "#6ad4ff", pool: [["seuilMaitrise", 2, 0.3], ["killsVirt", 2, 0.6], ["vsMaitrise", 4, 0.6], ["orMaitrise", 1, 0.3], ["altGold", 5, 0.8]] },
+  { id: "domination", nom: "Domination", ico: "♛", col: "#8be05f", pool: [["vsBossP", 6, 0.8], ["tokensB", 4, 0.6], ["essenceB", 4, 0.6], ["gainGardien", 5, 0.7], ["eclatsP", 2, 0.3]] },
+  { id: "celerite", nom: "Célérité", ico: "»", col: "#79d0c3", pool: [["asP", 3, 0.45], ["gJ.celerite", 6, 0.8], ["critC", 2, 0.3], ["gTous", 2, 0.3], ["vsMonP", 3, 0.45]] },
+  { id: "neant", nom: "Néant", ico: "🌌", col: "#7a6aff", paires: [
+    [["hpP", -12, -1], ["gTous", 8, 1.1]],
+    [["redSubis", -8, -0.7], ["eclatsP", 4, 0.5]],
+    [["coutShop", -12, -1], ["dropP", 8, 1.1]],
+    [["vsMonP", -8, -0.7], ["gainGardien", 12, 1.4], ["eclatsP", 2, 0.3]],
+    [["goldP", -10, -0.8], ["gJ.puissance", 10, 1.2], ["gJ.endurance", 10, 1.2]],
+  ] },
+];
+const ECHO_TYPE_BY_ID = Object.fromEntries(ECHO_TYPES.map((t) => [t.id, t]));
+const nomEcho = (e) => "Écho " + (e.type === "neant" ? "du Néant" : "de " + ECHO_TYPE_BY_ID[e.type].nom) + " " + rome(Math.min(10, e.niv));
+const echoSlotsMax = (meta) => 2 + Math.min(3, Math.floor(bonusOrigine(meta).echoSlots || 0));
+/* Poids de rareté : poussés par les Renaissances, la zone max, Destin et les Serments. */
+function echoRarWeights(meta) {
+  const b = bonusOrigine(meta);
+  const o = meta.origine || {};
+  const pts = Math.min(70, (b.echoRarPts || 0)
+    + (o.ren || 0) * 2
+    + Math.min(20, ((meta.cycle && meta.cycle.maxZone) || 0) * 1.5)
+    + (o.sermentsActifs || []).reduce((a, sid) => a + ((SERMENT_BY_ID[sid] || {}).echoRar || 0) * 8, 0)
+    + (ALTERATIONS.some((al) => altActive(meta, al.zoneId) && al.rew.echoRar) ? 5 : 0));
+  const base = [40, 24, 14, 9, 6, 4, 2, 1];
+  const w = base.map((x, i) => (i === 0 ? x / (1 + pts / 15) : x * (1 + (pts / 25) * (i / 7))));
+  return { w, legFloor: Math.min(15, b.echoLeg || 0) };
+}
+function generateEcho(meta, forcedType) {
+  const t = forcedType ? ECHO_TYPE_BY_ID[forcedType] : pick(ECHO_TYPES);
+  const { w, legFloor } = echoRarWeights(meta);
+  let ri = 0;
+  if (R() * 100 < legFloor) ri = 5 + (R() < 0.2 ? 1 : 0) + (R() < 0.05 ? 1 : 0);
+  else { const s = w.reduce((a, x) => a + x, 0); let x = R() * s; for (let i = 0; i < w.length; i++) { x -= w[i]; if (x <= 0) { ri = i; break; } } }
+  ri = Math.min(ri, RARS.length - 1);
+  const b = bonusOrigine(meta);
+  const niv = Math.max(1, 1 + Math.floor(Math.sqrt(((meta.origine || {}).ren || 0))) + Math.floor(b.echoNiv || 0) + Math.floor(R() * 3) - 1);
+  const nbEff = [1, 2, 2, 3, 3, 4, 4, 5][ri];
+  const mult = RARS[ri].mult;
+  let effets = [];
+  if (t.id === "neant") {
+    effets = pick(t.paires).map(([e, base2, sc]) => ({ e, v: Math.round((base2 + sc * niv) * mult * 10) / 10 }));
+  } else {
+    const pool = t.pool.slice();
+    for (let i = 0; i < nbEff && pool.length; i++) {
+      const [e, base2, sc] = pool.splice(Math.floor(R() * pool.length), 1)[0];
+      effets.push({ e, v: Math.round((base2 + sc * niv) * mult * 10) / 10 });
+    }
+  }
+  return { id: uid(), type: t.id, rar: RARS[ri].id, niv, effets };
+}
+function generateEchoOptions(meta) {
+  const n = 3 + Math.min(3, Math.floor(bonusOrigine(meta).echoChoix || 0));
+  return Array.from({ length: n }, () => generateEcho(meta));
+}
+function choisirEcho(G, echoId) {
+  const o = G.meta.origine;
+  const e = (o.echoChoix || []).find((x) => x.id === echoId); if (!e) return;
+  if (o.echos.length >= 60) { toast(G, "Inventaire d'Échos plein (60) — recycle d'abord", "#ff6b6b"); return; }
+  o.echos.push(e);
+  if (o.echosEq.length < echoSlotsMax(G.meta)) o.echosEq.push(e.id);
+  o.echoChoix = null;
+  toast(G, nomEcho(e) + " rejoint ton Origine", RAR_BY_ID[e.rar].col);
+  sfx("tier", G.meta.opts.sfx); G.saveNow = true;
+}
+function equiperEcho(G, id) {
+  const o = G.meta.origine;
+  if (o.echosEq.includes(id)) return;
+  if (o.echosEq.length >= echoSlotsMax(G.meta)) { toast(G, "Tous les slots d'Écho sont occupés", "#ffd45e"); return; }
+  if (!o.echos.find((e) => e.id === id)) return;
+  o.echosEq.push(id); sfx("equip", G.meta.opts.sfx); G.saveNow = true;
+}
+function retirerEcho(G, id) {
+  const o = G.meta.origine;
+  o.echosEq = o.echosEq.filter((x) => x !== id);
+  sfx("equip", G.meta.opts.sfx); G.saveNow = true;
+}
+function recyclerEcho(G, id) {
+  const o = G.meta.origine;
+  const e = o.echos.find((x) => x.id === id); if (!e) return;
+  o.echosEq = o.echosEq.filter((x) => x !== id);
+  o.echos = o.echos.filter((x) => x.id !== id);
+  const gain = (RARS.findIndex((r) => r.id === e.rar) + 1) * 2 + Math.min(10, e.niv);
+  o.eclats += gain; o.eclatsTot += gain;
+  toast(G, nomEcho(e) + " dissous : +" + gain + " ❖", "#ffe08a");
+  sfx("coin", G.meta.opts.sfx); G.saveNow = true;
+}
+
+/* Agrégat de tous les bonus permanents : Arbre + Échos équipés + bonus de Serments. */
+const CLES_BONUS = ["atkDep", "hpDep", "defDep", "asP", "coutShop", "effShop", "statsG", "earlyZ", "gTous", "gardeJauges", "seuilJ",
+  "seuilMaitrise", "killsVirt", "orMaitrise", "vsMaitrise", "vsMonP", "altGold", "armeT", "parZoneTrans", "essenceB", "gainGardien", "tokensB", "ferrailleP",
+  "echoRarPts", "echoNiv", "echoChoix", "echoSlots", "echoLeg", "sermUnlock", "sermMax", "sermMalus", "sermBonus", "altUnlock", "eclatsP",
+  "vsBossP", "critC", "redSubis", "goldP", "dropP", "atkP", "hpP", "exilLoin", "atkParGardien"];
+function bonusOrigine(meta) {
+  const b = Object.fromEntries(CLES_BONUS.map((k) => [k, 0]));
+  b.gJ = { puissance: 0, endurance: 0, fortune: 0, celerite: 0, precision: 0, domination: 0, extermination: 0 };
+  const appl = (key, val) => {
+    if (typeof key !== "string") return;
+    if (key.startsWith("gJ.")) { const g = key.slice(3); if (b.gJ[g] !== undefined) b.gJ[g] += val; }
+    else if (b[key] !== undefined) b[key] += val;
+  };
+  const o = meta.origine || {};
+  for (const nid in (o.arbre || {})) { const n = NODE_BY_ID[nid]; if (n) appl(n.eff, n.val * o.arbre[nid]); }
+  (o.echosEq || []).forEach((eid) => {
+    const e = (o.echos || []).find((x) => x.id === eid);
+    if (e) (e.effets || []).forEach((ef) => appl(ef.e, ef.v));
+  });
+  (o.sermentsActifs || []).forEach((sid) => {
+    const s = SERMENT_BY_ID[sid]; if (!s) return;
+    const amp = 1 + b.sermBonus / 100;
+    for (const k in s.bonus) appl(k, s.bonus[k] * amp);
+  });
+  return b;
 }
 function Fond({ zi }) {
   const ref = useRef(null);
@@ -2207,7 +2662,7 @@ function TabEquipement({ G, sel, setSel, maj }) {
             {ZONES.map((z) => {
               const d = ARMES_T[z.id]; if (!d) return null;
               const tr = meta.zones[z.id].trans;
-              const stats = tr >= 1 ? statsArmeT(z.id, tr) : null;
+              const stats = tr >= 1 ? statsArmeT(z.id, tr, meta) : null;
               const equipee = meta.equip.armeT && meta.equip.armeT.zone === z.id;
               return (
                 <div key={z.id} className="carte" style={{ borderColor: tr >= 1 ? d.col : undefined, opacity: tr >= 1 ? 1 : 0.55 }}>
@@ -2499,6 +2954,185 @@ function ModaleOpts({ G, fermer, maj, voirNotes }) {
 }
 
 /* ============================================================
+   ONGLET ORIGINE (v0.9.0)
+   ============================================================ */
+function EchoCard({ G, e, maj, mode }) {
+  const o = G.meta.origine;
+  const t = ECHO_TYPE_BY_ID[e.type], rc = RAR_BY_ID[e.rar];
+  return (
+    <div className="carte echocard" style={{ borderColor: rc.col }}>
+      <div className="ctitre small"><span style={{ color: t.col }}>{t.ico}</span> <span style={{ color: rc.col }}>{nomEcho(e)}</span> <span className="niv">{rc.nom} · niv {e.niv}</span></div>
+      {e.effets.map((ef, i) => (
+        <div key={i} className="cinfo" style={{ color: ef.v < 0 ? "#ff6b6b" : "#8be05f" }}>{ef.v > 0 ? "+" : ""}{String(ef.v).replace(".", ",")} {ECHO_LIB[ef.e] || ef.e}</div>
+      ))}
+      <div className="crow">
+        {mode === "choix" ? <button className="btn" onClick={() => { choisirEcho(G, e.id); maj(); }}>CHOISIR</button> : null}
+        {mode === "inv" ? (
+          o.echosEq.includes(e.id)
+            ? <button className="btn on" onClick={() => { retirerEcho(G, e.id); maj(); }}>ÉQUIPÉ · retirer</button>
+            : <button className="btn" onClick={() => { equiperEcho(G, e.id); maj(); }}>Équiper</button>
+        ) : null}
+        {mode === "inv" ? <button className="btn mini ghost danger" title="Dissoudre en Éclats" onClick={() => { recyclerEcho(G, e.id); maj(); }}>Dissoudre</button> : null}
+      </div>
+    </div>
+  );
+}
+
+function TabOrigine({ G, maj }) {
+  const meta = G.meta, o = meta.origine, cy = meta.cycle;
+  const [sub, setSub] = useState("ren");
+  const [confirmRen, setConfirmRen] = useState(false);
+  const calc = calcEclats(G);
+  const dispo = renaissanceDispo(meta);
+  const b = bonusOrigine(meta);
+  return (
+    <div>
+      <div className="crow" style={{ marginBottom: 10, alignItems: "center" }}>
+        {[["ren", "☀ Renaissance"], ["arbre", "🌳 Arbre d'Origine"], ["echos", "🌀 Échos"], ["serments", "🕯 Serments"], ["alt", "🌗 Zones altérées"]].map(([id, nom]) => (
+          <button key={id} className={"btn" + (sub === id ? " on" : " ghost")} onClick={() => setSub(id)}>{nom}{id === "echos" && o.echoChoix ? " ●" : ""}</button>
+        ))}
+        <span className="reschip tbside" style={{ marginLeft: "auto", color: "#ffe08a", fontSize: 17 }}>❖ {fmt(o.eclats)} <span className="tbdim">Éclats d'Origine</span></span>
+      </div>
+
+      {sub === "ren" ? (
+        <div>
+          <p className="note">La <b>Renaissance</b> dissout le cycle entier — zones, Transcendances, équipement, forge, jauges, stances — et le convertit en <b>❖ Éclats d'Origine</b>, la monnaie permanente de l'Arbre d'Origine. Disponible en atteignant la <b>zone 5</b> (ou en battant le Gardien de la zone 4).</p>
+          <div className="grid2">
+            <div className="carte">
+              <div className="ctitre small">☀ Cycle en cours</div>
+              <div className="cinfo statline"><span>Zone max atteinte</span><b>{ZONES[cy.maxZone] ? ZONES[cy.maxZone].nom : "—"} ({cy.maxZone + 1}/15)</b></div>
+              <div className="cinfo statline"><span>Niveau global max</span><b>{cy.maxNiv || 1}</b></div>
+              <div className="cinfo statline"><span>Gardiens vaincus</span><b>{Object.keys(cy.gardiens || {}).length}</b></div>
+              <div className="cinfo statline"><span>Monstres tués (cycle)</span><b>{fmt(cy.kills || 0)}</b></div>
+              <div className="cinfo statline"><span>Serments actifs</span><b>{(o.sermentsActifs || []).length} (×{String(calc.mult).replace(".", ",")} Éclats)</b></div>
+            </div>
+            <div className="carte">
+              <div className="ctitre small">📜 Historique d'Origine</div>
+              <div className="cinfo statline"><span>Renaissances</span><b>{o.ren}</b></div>
+              <div className="cinfo statline"><span>Meilleure zone (lifetime)</span><b>{o.bestZone || "—"}</b></div>
+              <div className="cinfo statline"><span>Meilleur gain d'Éclats</span><b>❖ {fmt(o.meilleurGain || 0)}</b></div>
+              <div className="cinfo statline"><span>Éclats gagnés au total</span><b>❖ {fmt(o.eclatsTot || 0)}</b></div>
+              <div className="cinfo statline"><span>Éclats dépensés</span><b>❖ {fmt(o.eclatsDep || 0)}</b></div>
+            </div>
+          </div>
+          <div className="carte" style={{ marginTop: 10, borderColor: "#ffe08a" }}>
+            <div className="ctitre small">❖ Gain estimé à la Renaissance : <b style={{ color: "#ffe08a" }}>{fmt(calc.total)}</b> <span className="niv">base {fmt(calc.brut)} × {String(calc.mult).replace(".", ",")}</span></div>
+            <div className="cinfo togline">{calc.det.map(([nom2, v], i) => <span key={i} className="slottag">{nom2} : +{fmt(v)}</span>)}</div>
+            <div className="crow">
+              <button className="btn big" style={{ borderColor: "#ffe08a", color: "#ffe08a" }} disabled={!dispo} onClick={() => setConfirmRen(true)}>
+                {dispo ? "☀ RENAÎTRE" : "☀ RENAÎTRE — atteins la zone 5 pour débloquer (" + (cy.maxZone + 1) + "/5)"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {sub === "arbre" ? (
+        <div>
+          <div className="arbretronc">🌳 LE TRONC · {o.ren} Renaissance{o.ren > 1 ? "s" : ""} · ❖ {fmt(o.eclats)} disponibles</div>
+          <div className="arbre">
+            {BRANCHES.map((br) => (
+              <div key={br.id} className="branche">
+                <div className="brtitre" style={{ color: br.col }}>{br.ico} {br.nom}<div className="brtheme">{br.theme}</div></div>
+                <div className="brnodes" style={{ borderColor: br.col }}>
+                  {NODES.filter((n) => n.br === br.id).map((n) => {
+                    const rang = o.arbre[n.id] || 0;
+                    const reqOk = !n.req || (o.arbre[n.req] > 0);
+                    const maxed = rang >= n.max;
+                    const c = coutNode(n, rang);
+                    const desc = n.desc.replace("{v}", String(n.val).replace(".", ","));
+                    return (
+                      <div key={n.id} className={"node" + (maxed ? " maxed" : reqOk ? (o.eclats >= c ? " dispo" : " cher") : " verrou")}
+                        style={maxed ? { borderColor: br.col } : null}
+                        title={desc + (rang > 0 ? " — total actuel : " + String(Math.round(n.val * rang * 100) / 100).replace(".", ",") : "") + (reqOk ? "" : " (node précédent requis)")}
+                        onClick={() => { if (reqOk && !maxed) { acheterNode(G, n.id); maj(); } }}>
+                        <div className="nodenom">{n.nom}</div>
+                        <div className="nodedesc">{desc}</div>
+                        <div className="nodebas">{maxed ? "MAX " + rang + "/" + n.max : rang + "/" + n.max + " · ❖ " + fmt(c)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {sub === "echos" ? (
+        <div>
+          {o.echoChoix ? (
+            <div className="carte" style={{ borderColor: "#7a6aff", marginBottom: 10 }}>
+              <div className="ctitre small">🌀 Un Écho t'attend — choisis-en <b>un seul</b> :</div>
+              <div className="grid2">{o.echoChoix.map((e) => <EchoCard key={e.id} G={G} e={e} maj={maj} mode="choix" />)}</div>
+            </div>
+          ) : <p className="note">Les Échos sont des reliques permanentes, séparées de l'équipement : tu en choisis un après chaque Renaissance. Slots équipés : <b>{o.echosEq.length}/{echoSlotsMax(meta)}</b> (extensibles via Destin).</p>}
+          {o.echos.length === 0 && !o.echoChoix ? <div className="cinfo dim">Aucun Écho pour l'instant — accomplis ta première Renaissance.</div> : null}
+          <div className="grid2">
+            {o.echos.slice().sort((a, bb) => (o.echosEq.includes(bb.id) ? 1 : 0) - (o.echosEq.includes(a.id) ? 1 : 0)).map((e) => <EchoCard key={e.id} G={G} e={e} maj={maj} mode="inv" />)}
+          </div>
+        </div>
+      ) : null}
+
+      {sub === "serments" ? (
+        <div>
+          <p className="note">Les <b>Serments</b> durcissent le cycle en échange d'un multiplicateur d'Éclats à la Renaissance{sermentsDebloques(meta) ? "" : " — débloque-les via le node « Serment scellé » de la branche Destin"}. Actifs : <b>{(o.sermentsActifs || []).length}/{sermentsMax(meta)}</b> · Multiplicateur total : <b style={{ color: "#ffe08a" }}>×{String(calc.mult).replace(".", ",")}</b></p>
+          <div className="grid2">
+            {SERMENTS.map((s) => {
+              const actif = (o.sermentsActifs || []).includes(s.id);
+              const locked = !sermentsDebloques(meta);
+              return (
+                <div key={s.id} className="carte" style={{ borderColor: actif ? "#ff6b6b" : undefined, opacity: locked ? 0.5 : 1 }}>
+                  <div className="ctitre small">{s.ico} {s.nom} <span className="niv">×{String(s.eclatsM).replace(".", ",")} Éclats{s.echoRar ? " · Échos plus rares" : ""}</span></div>
+                  <div className="cinfo dim">{s.desc}</div>
+                  <div className="crow"><button className={"btn" + (actif ? " danger" : "")} disabled={locked} onClick={() => { basculerSerment(G, s.id); maj(); }}>{locked ? "🔒 Verrouillé" : actif ? "ROMPRE" : "PRÊTER SERMENT"}</button></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {sub === "alt" ? (
+        <div>
+          <p className="note">Les <b>Zones altérées</b> sont des variantes plus dures et plus rentables des zones{altsDebloquees(meta) ? "" : " — débloquées après ta première Renaissance (ou via le node « Rite d'altération »)"}. Les Gardiens vaincus en zone altérée rapportent plus d'Éclats. Zones 6-15 : altérations à venir.</p>
+          <div className="grid2">
+            {ALTERATIONS.map((a) => {
+              const actif = altActive(meta, a.zoneId);
+              const locked = !altsDebloquees(meta);
+              return (
+                <div key={a.id} className="carte" style={{ borderColor: actif ? ZONE_BY_ID[a.zoneId].col : undefined, opacity: locked ? 0.5 : 1 }}>
+                  <div className="ctitre small" style={{ color: ZONE_BY_ID[a.zoneId].col }}>🌗 {a.nom} <span className="niv">{ZONE_BY_ID[a.zoneId].nom}</span></div>
+                  <div className="cinfo dim">{a.desc}</div>
+                  <div className="cinfo" style={{ color: "#ff6b6b" }}>PV ×{String(a.mob.hp).replace(".", ",")} · ATQ ×{String(a.mob.atk).replace(".", ",")}{a.mob.as !== 1 ? " · Vitesse ×" + String(a.mob.as).replace(".", ",") : ""}{a.mob.bossHp ? " · PV boss ×" + String(a.mob.bossHp).replace(".", ",") : ""}</div>
+                  <div className="cinfo" style={{ color: "#8be05f" }}>Or ×{String(a.rew.gold).replace(".", ",")}{a.rew.essence ? " · essence ×2" : ""}{a.rew.ferraille ? " · +" + a.rew.ferraille + "% ferraille" : ""}{a.rew.echoRar ? " · Échos plus rares" : ""}</div>
+                  <div className="crow"><button className={"btn" + (actif ? " danger" : "")} disabled={locked} onClick={() => { basculerAlt(G, a.zoneId); maj(); }}>{locked ? "🔒 Verrouillé" : actif ? "DÉSACTIVER" : "ALTÉRER"}</button></div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {confirmRen ? (
+        <div className="voile" onClick={() => setConfirmRen(false)}>
+          <div className="modale" onClick={(e) => e.stopPropagation()}>
+            <div className="mtitre" style={{ color: "#ffe08a" }}>RENAISSANCE</div>
+            <div className="cinfo" style={{ textAlign: "center" }}>Gain : <b style={{ color: "#ffe08a" }}>❖ {fmt(calc.total)} Éclats d'Origine</b></div>
+            <div className="msep" style={{ color: "#ff6b6b" }}>SERA DISSOUS</div>
+            <div className="cinfo dim">Run et or · progression et déblocage des zones · bestiaire et maîtrises · Transcendances et armes de Transcendance · jauges méta{b.gardeJauges > 0 ? " (" + Math.min(50, b.gardeJauges) + "% conservés)" : ""} · niveaux de stances · équipement, inventaire, ensembles · ferraille et essence résiduelle</div>
+            <div className="msep" style={{ color: "#8be05f" }}>SERA CONSERVÉ</div>
+            <div className="cinfo dim">Éclats d'Origine · Arbre d'Origine · Échos · Serments débloqués · Zones altérées · statistiques lifetime · réglages, recyclage, priorités</div>
+            <button className="btn big" style={{ borderColor: "#ffe08a", color: "#ffe08a" }} onClick={() => { performRenaissance(G); setConfirmRen(false); setSub("echos"); maj(); }}>☀ RENAÎTRE MAINTENANT</button>
+            <button className="btn ghost" onClick={() => setConfirmRen(false)}>Pas encore</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* ============================================================
    APPLICATION
    ============================================================ */
 function EncaisserBtn({ G, maj }) {
@@ -2728,6 +3362,22 @@ const CSS = `
 .modale.large{ width:min(880px,94vw); }
 .ctitel2{ font-family:'Cinzel', Georgia, serif; font-size:11.5px; letter-spacing:1.5px; text-transform:uppercase; margin:2px 0 4px; }
 .eqdoll .dollmid{ flex:0 1 270px; min-width:220px; padding:16px 18px; }
+.arbretronc{ font-family:'Cinzel', Georgia, serif; text-align:center; font-size:15px; letter-spacing:2px; color:#ffe08a; border:2px solid #c9a227; border-radius:10px; padding:7px; margin-bottom:10px; background:rgba(201,162,39,.07); }
+.arbre{ display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:8px; align-items:start; }
+.branche{ min-width:0; }
+.brtitre{ font-family:'Cinzel', Georgia, serif; font-size:14px; font-weight:700; text-align:center; margin-bottom:6px; }
+.brtheme{ font-family:'Jost', sans-serif; font-size:11.5px; color:var(--dim); font-weight:500; letter-spacing:0; }
+.brnodes{ display:flex; flex-direction:column; gap:5px; border-left:2px solid var(--line); padding-left:8px; margin-left:4px; }
+.node{ position:relative; border:2px solid #39406a; border-radius:9px; background:var(--panel2); padding:5px 7px; cursor:pointer; }
+.node::before{ content:""; position:absolute; left:-10px; top:50%; width:8px; height:2px; background:inherit; border-top:2px solid #39406a; }
+.node.verrou{ opacity:.38; cursor:default; }
+.node.cher{ opacity:.72; }
+.node.dispo{ border-color:#8be05f; box-shadow:0 0 7px rgba(139,224,95,.25); }
+.node.maxed{ background:rgba(255,224,138,.09); cursor:default; }
+.nodenom{ font-family:'Cinzel', Georgia, serif; font-size:12px; font-weight:700; }
+.nodedesc{ font-size:12.5px; color:var(--dim); line-height:1.25; }
+.nodebas{ font-size:12px; color:#ffe08a; margin-top:2px; }
+.echocard{ min-width:0; }
 .dstance{ font-family:'Cinzel', Georgia, serif; font-size:15px; font-weight:700; margin-top:8px; text-align:center; }
 .pstats .statcol{ margin-bottom:8px; gap:5px; }
 .doll{ display:flex; gap:14px; justify-content:center; align-items:stretch; margin-bottom:10px; }
@@ -2776,6 +3426,17 @@ const CSS = `
 .btn.mini{ padding:4px 7px; font-size:10px; text-transform:none; }
 `;
 
+/* Accès de test headless (Node) — aucun effet en jeu. */
+export const __test = {
+  metaInitiale, runInitiale, depuisSave, versSave, heroStats, tick, creerMonstre,
+  calcEclats, performRenaissance, renaissanceDispo, renaissanceVisible,
+  acheterNode, coutNode, bonusOrigine, malusSerments, coutReel,
+  generateEcho, generateEchoOptions, choisirEcho, equiperEcho, retirerEcho, recyclerEcho, echoSlotsMax,
+  basculerSerment, sermentsDebloques, sermentsMax, basculerAlt, altsDebloquees, altActive, altMods,
+  zScale, tuerMonstre, transcender, statsArmeT,
+  ZONES, MONSTRES, NODES, NODE_BY_ID, BRANCHES, SERMENTS, ALTERATIONS, GAUGES, RARS, ECHO_TYPES, ARMES_T, SLOTS,
+};
+
 export default function Transcendance() {
   const Gref = useRef(null);
   const [, setT] = useState(0);
@@ -2785,6 +3446,7 @@ export default function Transcendance() {
   const [opts, setOpts] = useState(false);
   const [notes, setNotes] = useState(false);
   const [majDispo, setMajDispo] = useState(null);
+  const [choixVu, setChoixVu] = useState(0);
   const [pret, setPret] = useState(false);
   const lastSave = useRef(0);
 
@@ -2840,6 +3502,7 @@ export default function Transcendance() {
           <span className="tbside reschip tokc">⬡ {G.meta.tokens}{run.tokensPend > 0 ? <span className="pend">+{run.tokensPend}</span> : null} <span className="tbdim">tokens</span></span>
           <span className="tbside reschip" style={{ color: "#b9c2d9" }}>⚒ {fmt(G.meta.ferraille)} <span className="tbdim">ferraille</span></span>
           <span className="tbside reschip" style={{ color: "#ff3b5c" }}>✦ {G.meta.essence} <span className="tbdim">essence{G.meta.essence > 1 ? "s" : ""} résiduelle{G.meta.essence > 1 ? "s" : ""}</span></span>
+          {renaissanceVisible(G.meta) ? <span className="tbside reschip" style={{ color: "#ffe08a" }}>❖ {fmt(G.meta.origine.eclats)} <span className="tbdim">éclats</span></span> : null}
         </span>
         <span className="tbcentre">
           <span className="zlabel">
@@ -2853,7 +3516,7 @@ export default function Transcendance() {
       </div>
       <Scene G={G} />
       <div className="tabsbar">
-        {[["boutique", "Boutique"], ["stances", "Stances"], ["equip", "Équipement"], ["best", "Bestiaire"]].map(([id, nom]) => (
+        {[["boutique", "Boutique"], ["stances", "Stances"], ["equip", "Équipement"], ["best", "Bestiaire"]].concat(renaissanceVisible(G.meta) ? [["origine", "☀ Origine"]] : []).map(([id, nom]) => (
           <button key={id} className={"tabbtn" + (tab === id ? " on" : "")} onClick={() => { setTab(id); if (id === "equip") { G.dropFlag = false; } }}>
             {nom}{id === "equip" && G.dropFlag ? <span className="bulle" /> : null}
           </button>
@@ -2866,6 +3529,7 @@ export default function Transcendance() {
             {tab === "stances" ? <TabStances G={G} maj={maj} /> : null}
             {tab === "equip" ? <TabEquipement G={G} sel={sel} setSel={setSel} maj={maj} /> : null}
             {tab === "best" ? <TabBestiaire G={G} maj={maj} /> : null}
+            {tab === "origine" ? <TabOrigine G={G} maj={maj} /> : null}
           </div>
         </div>
         <div className="zoneDroite colcote">
@@ -2932,6 +3596,16 @@ export default function Transcendance() {
       {opts ? <ModaleOpts G={G} fermer={() => setOpts(false)} maj={maj} voirNotes={() => { setOpts(false); setNotes(true); }} /> : null}
       {notes ? <ModaleNouveautes G={G} fermer={() => { G.meta.versionVue = VERSION; G.saveNow = true; setNotes(false); }} /> : null}
       {majDispo && !notes ? <ModaleMaj G={G} version={majDispo} fermer={() => setMajDispo(null)} maj={maj} /> : null}
+      {!notes && G.meta.origine.echoChoix && G.meta.origine.echoChoix.length > 0 && G.meta.origine.echoChoix[0].id !== choixVu ? (
+        <div className="voile">
+          <div className="modale large" onClick={(e) => e.stopPropagation()}>
+            <div className="mtitre" style={{ color: "#7a6aff" }}>L'ORIGINE TE PROPOSE UN ÉCHO</div>
+            <div className="cinfo dim" style={{ textAlign: "center" }}>Choisis-en un seul — les autres se dissiperont.</div>
+            <div className="grid2">{G.meta.origine.echoChoix.map((e) => <EchoCard key={e.id} G={G} e={e} maj={maj} mode="choix" />)}</div>
+            <button className="btn ghost" onClick={() => setChoixVu(G.meta.origine.echoChoix[0].id)}>Plus tard (Origine → Échos)</button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

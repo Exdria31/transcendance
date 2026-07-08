@@ -1,8 +1,14 @@
 # Transcendance — instructions pour Claude Code
 
 ## Projet
-Jeu idle roguelite en un seul fichier React : `src/transcendance.jsx` (~1900 lignes, en français).
-Die & retry avec jauges méta, 3 zones × 10 niveaux, bestiaire, stances, équipement, monnaie c/a/o/p.
+Jeu idle roguelite en un seul fichier React : `src/transcendance.jsx` (~3500 lignes, en français).
+Die & retry avec jauges méta, 15 zones × 10 niveaux (mur brutal dès la zone 5, scaling
+centralisé dans `zScale`), bestiaire, stances, équipement (affinage/tiers/raretés),
+Transcendance (reset de zone) et Renaissance (reset global → Éclats d'Origine, Arbre
+d'Origine 5 branches ×30 nodes, Échos, Serments, Zones altérées). Monnaies : pièces
+(cuivre→diamant), ferraille, essence résiduelle, tokens, éclats d'origine.
+Tests headless : export `__test` en fin de jsx — bundler un entry Node avec esbuild
+(cjs) et appeler les fonctions du moteur directement.
 
 ## Règles
 - TOUT le jeu vit dans `src/transcendance.jsx`. Ne pas le découper sans demande explicite.
